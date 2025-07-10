@@ -59,6 +59,7 @@ class Case(UserDict):
 
         logger.info(f"Loading Excel file: {filepath}")
         excel_file = pd.ExcelFile(filepath, engine='openpyxl')
+        logger.info(f"Excel file loaded: {filepath}")
 
         sheet_config: Dict[str, Dict[str, Any]] = {
             'bus': {
@@ -141,8 +142,3 @@ if __name__ == "__main__":
     testcase.load_excel_snapshot_case("end-to-end-testcase.xlsx", timeseries=True)
     testcase.summary()
 
-# testcase = Case()
-# testcase.load_excel_snapshot_case("end-to-end-testcase.xlsx")
-
-
-...

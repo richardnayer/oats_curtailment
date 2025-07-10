@@ -1,6 +1,6 @@
 import pytest
 import pandas as pd
-from load_case import Case
+from data_io.load_case import Case
 from pathlib import Path
 
 @pytest.fixture
