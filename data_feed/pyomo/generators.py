@@ -208,15 +208,5 @@ def LIFO_EER_policy(case) -> List[str]:
     return helpers.get_param_list(case, 'generators', 'name', 'export_policy', '=', 'LIFO')
 
 def LIFO_combinations(case):
-    LIFO_gens = case.generators.loc[case.generators['export_policy'] == "LIFO"]
-    grouped = LIFO_gens.sort_values(['lifo_group', 'lifo_position'])
-    lst = (LIFO_gens.sort_values(['lifo_group','lifo_position'],ascending=True).groupby('lifo_group').name.apply(lambda x: list(iter.combinations(x,2))).to_list())
-    lst = [x for x in lst if x!=[]] #remove empty lists, units with single LIFO results in empty lists
-    flat_lst = [x for x1 in lst for x in x1] #flatten the list
-    return flat_lst
+    return helpers.get_ordered_groupwise_combinations(case, component, 'name', 'lifo_group', 'lifo_position')
 
-    # LIFO_gens = case.generators.loc[case.generators['export_policy'] == "LIFO"]
-    # grouped = LIFO_gens.sort_values(['lifo_group', 'lifo_position'])
-    # combos = grouped.groupby('lifo_group')['name'].apply(lambda x: list(it.combinations(x, 2))).tolist()
-    # combos = [combo for sublist in combos for combo in sublist if combo]
-    # return combos

@@ -10,14 +10,11 @@ case = load_case.Case()
 case._load_excel_snapshot_case("end-to-end-testcase.xlsx")
 case.summary()
 
-map = line_attr.bus_line_in(case)
-print(map)
+param_list = helpers.get_param_dict(case, 'generators', 'name', 'PGUB', 'export_policy', '!=', 'Pro-Rata')
 
-gen = helpers.get_param_list(case, 'generators', 'export_policy', '=', 'Individual', 'name')
-print(gen)
+component_map = helpers.component_map_complete_dict(case, 'busses', 'name', 'generators', 'name', 'busname')
 
-what = helpers.comma_param_to_dict(case, 'generators', 'name', 'prorata_groups')
-....
+...
 # model = AbstractModel()
 # instance = model.create_instance()
 
