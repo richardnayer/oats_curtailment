@@ -11,6 +11,7 @@ from collections import UserDict
 from pathlib import Path
 from typing import Dict, Any
 import pandas as pd
+import data_io.helpers as helpers
 
 # Set up logger
 logger = logging.getLogger(__name__)
@@ -190,7 +191,6 @@ class Case(UserDict):
         print("Case Summary:")
         for key, df in self.data.items():
             print(f" - {key}: {df.shape[0]} rows")
-
 
 
 if __name__ == "__main__":
