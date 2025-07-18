@@ -18,7 +18,7 @@ def get_filtered_df(case: object, component: str, filter_param: Union[str, float
     df = getattr(case,component)
 
     #Check that all filters are set if one is set.
-    if any([filter_param, operation, filter_value]) and not all([filter_param, operation, filter_value]):
+    if any(param is None for param in [filter_param, operation, filter_value]) and not all(param is None for param in [filter_param, operation, filter_value]):
         raise ValueError("If any of filter_param, operation, or filter_value is set, all must be provided.")
 
     #Check selected operator is a supported operation
@@ -267,3 +267,25 @@ def get_zipped_param_list(case: object, component: str, index: str, zip_params: 
     filtered_df = get_filtered_df(case, component, filter_param, operation, filter_value, [index]+zip_params)
 
     return dict(zip(filtered_df[index] , zip(*(filtered_df[param] for param in zip_params))))
+
+def get_paired_params_list(case, component, param_1, param_2, param_2_comma = False, filter_param: Union[str, float, int] = None, operation: str = None, filter_value: Union[str, float,int] = None):
+    '''Return list of components filtered by a parameter'''
+
+    #Check if component exists
+    if not hasattr(case, component):
+        raise AttributeError(f"Case object has no component '{component}'")
+    df = getattr(case, component)
+
+    #Check parameters exist in df
+    for param in [param_1, param_2]:
+        if param not in df.columns:
+            raise KeyError(f"Parameter '{param}' not found in '{component}' data")   
+    
+    #Get Dictionary
+    if param_2_comma == True:
+        dictionary = comma_param_to_dict(case, component, param_1, param_2, filter_param, operation, filter_value)
+    else:
+        dictionary = get_param_dict(case, component, param_1, param_2, filter_param, operation, filter_value)
+    
+    #Flatten List
+    return [(param_1, param_2_item) for param_1, param_2 in dictionary.items() for param_2_item in param_2]
