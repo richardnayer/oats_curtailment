@@ -162,28 +162,28 @@ def uncontrollable_EER_policy(case) -> List[str]:
     Returns a list of all generators that cannot be export controlled (i.e. they will operate at their maximum). In reality this represents older generation
     assets, of smaller export capacities, that do not have DNO control systems at site, and cannot be included in a smart curtailment system.
     '''
-    return helpers.get_param_list(case, 'generators', 'name', 'export_policy', '=', 'Uncontrollable', )
+    return helpers.get_param_list(case, 'generators', 'name', 'export_policy', '=', 'Uncontrollable')
 
 ### Pro-Rata Policy
 def prorata_EER_policy(case) -> List[str]:
     '''
     Returns a list of all generators that have Pro-Rata Enfored Export Reduction (EER) policies
     '''
-    return helpers.get_param_list(case, 'generators','name', 'export_policy', '=', 'Pro-Rata', )
+    return helpers.get_param_list(case, 'generators','name', 'export_policy', '=', 'Pro-Rata')
 
 ### Non-Synchronous Generators Set
 def non_synchronous_gen(case) -> List[str]:
     '''
     Returns a list of all generators that are non-synchronous generators.
     '''
-    return helpers.get_param_list(case, 'generators', 'name', 'synchronous', '=', 'No', )
+    return helpers.get_param_list(case, 'generators', 'name', 'synchronous', '=', 'No')
 
 ### Synchronous Generators Set
 def synchronous_gen(case) -> List[str]:
     '''
     Returns a list of all generators that are synchronous generators.
     '''
-    return helpers.get_param_list(case, 'generators', 'name', 'synchronous', '=', 'Yes', )
+    return helpers.get_param_list(case, 'generators', 'name', 'synchronous', '=', 'Yes')
 
 def prorata_groups(case) -> List[str]:
     return helpers.comma_param_to_list(case, component, 'prorata_groups', 'export_policy', '=', 'Pro-Rata')
