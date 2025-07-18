@@ -15,42 +15,36 @@ def _filtered_df(case: object, component: str, filter_param: Union[str, float, i
 
     #Check selected operator is a supported operation
     if operation not in supported_operations:
-        raise Exception(f"The operator {operation} is not defined for this function. Please use one of {supported_operations}")
+        raise ValueError(f"The operator {operation} is not defined for this function. Please use one of {supported_operations}")
 
     #Check filter parameters exist in dataframe
-    #TODO - Currently code won't work if both filter_param and returned_params is set as None
-    #TODO - Implement handling for returned_params = None
-    for param in [filter_param] + returned_params:
+    for param in [filter_param] + (returned_params or []):
         if param not in df.columns and param is not None:
-            raise KeyError(f"Parameter '{param}' not found in '{component}' data")
-    
+            raise KeyError(f"Parameter '{param}' not found in '{component}' data") 
+
     #Check filter_param and filter types are numeric if required
     if operation in ['>=', '>', '<=', '<']:
         if not pd.api.types.is_numeric_dtype(df[filter_param]):
             raise TypeError(f"The column '{filter_param}' must be numeric for operation '{operation}'")
         if not isinstance(filter_value, (int, float)):
             raise TypeError(f"The filter_value must be int or float for operation '{operation}'")
+        
+    op_map = {
+        '=' : lambda df: df[filter_param] == filter_value,
+        '!=': lambda df: df[filter_param] != filter_value,
+        '>=': lambda df: df[filter_param] >= filter_value,
+        '>' : lambda df: df[filter_param] >  filter_value,
+        '<=': lambda df: df[filter_param] <  filter_value,
+        '<' : lambda df: df[filter_param] <= filter_value,
+    }
 
-    #TODO - O
-
-    #Perform Operation
-    match operation:
-        case None:
+    if operation is None:
+        if returned_params is None:
+            return df
+        else:
             return df.loc[:, returned_params]
-        case '=':
-            return df.loc[df[filter_param] == filter_value, returned_params]
-        case '!=':
-            return df.loc[df[filter_param] != filter_value, returned_params]
-        case '>=':
-            return df.loc[df[filter_param] >= filter_value, returned_params]
-        case '>':
-            return df.loc[df[filter_param] > filter_value, returned_params]
-        case '<=':
-            return df.loc[df[filter_param] <= filter_value, returned_params]
-        case '<':
-            return df.loc[df[filter_param] < filter_value, returned_params]
-        case _:
-            raise Exception(f"Unsupported DataFrame Filter Operation '{operation}'")
+    else:
+        return df.loc[op_map[operation](df), returned_params] if returned_params else df.loc[op_map[operation](df)]
 
 def get_PerUnit_param_dict(case: object, component: str, index:str , param: float, baseMVA: float, filter_param: Union[str, float, int] = None, operation: str = None, filter_value: Union[str, float,int] = None) -> Dict[str, float]:
     '''Return a dict mapping the index (e.g. generator name) to parameter scaled against baseMVA'''

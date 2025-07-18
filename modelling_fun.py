@@ -14,6 +14,8 @@ param_list = helpers.get_param_dict(case, 'generators', 'name', 'PGUB', 'export_
 
 component_map = helpers.component_map_complete_dict(case, 'busses', 'name', 'generators', 'name', 'busname')
 
+helpers._filtered_df(case, 'generators', 'export_policy', '!=', 'Pro-Rata')
+helpers._filtered_df()
 ...
 # model = AbstractModel()
 # instance = model.create_instance()
