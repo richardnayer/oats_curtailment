@@ -14,8 +14,12 @@ param_list = helpers.get_param_dict(case, 'generators', 'name', 'PGUB', 'export_
 
 component_map = helpers.component_map_complete_dict(case, 'busses', 'name', 'generators', 'name', 'busname')
 
-helpers._filtered_df(case, 'generators', 'export_policy', '!=', 'Pro-Rata')
-helpers._filtered_df()
+comma_param_to_dict = helpers.comma_param_to_dict(case, 'generators', 'name', 'prorata_groups', 'export_policy', '!=', 'Pro-Rata')
+
+ordered_groupwise_combinations = helpers.get_ordered_groupwise_combinations(case, 'generators', 'name', 'lifo_group', 'lifo_position')
+
+get_zipped_params = helpers.get_zipped_param_list(case, 'branches', 'name', ['to_busname', 'from_busname'])
+
 ...
 # model = AbstractModel()
 # instance = model.create_instance()
