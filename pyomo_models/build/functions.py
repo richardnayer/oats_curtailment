@@ -43,3 +43,8 @@ def add_sets_to_instance(instance: object, sets_dict_obj: dict):
                     dimen=dimen,
                 )
             )
+
+def add_constraints_to_instance(instance: object, constraints_dict: dict, constraint_block: str):
+    ...
+    for constraint in constraints_dict.constraint_block.items():
+        

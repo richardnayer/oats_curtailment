@@ -15,6 +15,14 @@ case.summary()
 model = AbstractModel()
 instance = model.create_instance()
 
+testydict = {'B': {
+                'type': 'flat',
+                'index': None,
+                'within': None,
+                'dimen': 1,
+                'initialize': lambda: helpers.get_param_list(case, 'busses', 'name'),
+            },
+}
 
 add_sets_to_instance(instance, Sets_Blocks(case))
 
