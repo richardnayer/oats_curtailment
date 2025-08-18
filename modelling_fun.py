@@ -122,7 +122,7 @@ snapshot_DCOPF_uncontrollable_constraints = [
 
 add_sets_to_instance(instance, Sets_Blocks(case),snapshot_DCOPF_sets)
 
-add_params_to_instance(instance, Params_Blocks(case, instance), snapshot_DCOPF_params)
+add_params_to_instance(instance, Params_Blocks(case), snapshot_DCOPF_params)
 
 add_variables_to_instance(instance, Variables_Blocks(instance), snapshot_DCOPF_variables)
 
