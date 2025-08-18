@@ -382,6 +382,12 @@ class Variables_Blocks():
                 'bounds': None,
                 'initialize': None
             },
+            'minimum_zeta': {
+                'index': instance.G_prorata_pairs,
+                'domain': NonNegativeReals,
+                'bounds': (0, 1),
+                'initialize': None
+            },
 
             #LIFO Curtailment Control Variables
             'gamma': { # indicator variable for wind curtailment on/off
@@ -442,16 +448,18 @@ class Constraint_Blocks():
             'line_cont_realpower_max_ngtve': {
                 'rule': lambda instance, line: instance.pL[line] >= -instance.line_max_continuous_P[line],
                 'index': instance.L
-            },            
-            'line_real_alpha_controlled': {
+            },
+            
+            # --- DEMAND CONSTRAINTS ---            
+            'demand_real_alpha_controlled': {
                 'rule': lambda instance, demand: instance.pD[demand] == instance.alpha[demand]*instance.PD[demand],
                 'index': instance.D
             },
-            'line_alpha_max': {
+            'demand_alpha_max': {
                 'rule': lambda instance, demand: instance.alpha[demand] <= 1,
                 'index': instance.D
             },
-            'line_alpha_fixneg': {
+            'demand_alpha_fixneg': {
                 'rule': lambda instance, demand: instance.alpha[demand] == 1,
                 'index': instance.DNeg
             },
@@ -564,7 +572,7 @@ class Constraint_Blocks():
             },
 
             # --- TRANSFORMER CONSTRAINTS---
-            'transf_continuous_real_max_pstveDCOPF_lines': {
+            'transf_continuous_real_max_pstve': {
                 'rule': lambda instance, transformer: instance.pLT[transformer] <= instance.transformer_max_continuous_P[transformer],
                 'index': instance.TRANSF
             },
