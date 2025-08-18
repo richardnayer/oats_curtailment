@@ -1,602 +1,772 @@
-import data_io.load_case as load_case
+from dataclasses import dataclass
+from enum import Enum
+from typing import Any, Callable, Dict, Optional, Tuple, Union
+
 import data_io.helpers as helpers
 from pyomo.environ import *
 
-class Sets_Blocks():
-    def __init__(self, case):
-        self.blocks = {
+
+class ComponentName(str, Enum):
+    """Enumeration of all set, variable and constraint identifiers."""
+
+    # Sets
+    B = "B"
+    b0 = "b0"
+    G = "G"
+    generator_mapping = "generator_mapping"
+    G_LIFO = "G_LIFO"
+    G_LIFO_pairs = "G_LIFO_pairs"
+    G_prorata = "G_prorata"
+    G_prorata_map = "G_prorata_map"
+    G_prorata_pairs = "G_prorata_pairs"
+    G_individual = "G_individual"
+    G_uncontrollable = "G_uncontrollable"
+    G_s = "G_s"
+    G_ns = "G_ns"
+    prorata_groups = "prorata_groups"
+    L = "L"
+    bus_line_in = "bus_line_in"
+    bus_line_out = "bus_line_out"
+    line_busses = "line_busses"
+    TRANSF = "TRANSF"
+    bus_transformer_in = "bus_transformer_in"
+    bus_transformer_out = "bus_transformer_out"
+    transformer_busses = "transformer_busses"
+    D = "D"
+    DNeg = "DNeg"
+    demand_bus_mapping = "demand_bus_mapping"
+
+    # Variables
+    pG = "pG"
+    pD = "pD"
+    alpha = "alpha"
+    zeta_cg = "zeta_cg"
+    zeta_wind = "zeta_wind"
+    zeta_bin = "zeta_bin"
+    minimum_zeta = "minimum_zeta"
+    gamma = "gamma"
+    beta = "beta"
+    deltaL = "deltaL"
+    deltaLT = "deltaLT"
+    delta = "delta"
+    pL = "pL"
+    pLT = "pLT"
+
+    # Parameters
+    line_max_continuous_P = "line_max_continuous_P"
+    line_susceptance = "line_susceptance"
+    line_reactance = "line_reactance"
+    transformer_max_continuous_P = "transformer_max_continuous_P"
+    transformer_susceptance = "transformer_susceptance"
+    transformer_reactance = "transformer_reactance"
+    PD = "PD"
+    VOLL = "VOLL"
+    PGmax = "PGmax"
+    PGmin = "PGmin"
+    PGMINGEN = "PGMINGEN"
+    c0 = "c0"
+    c1 = "c1"
+    bid = "bid"
+    baseMVA = "baseMVA"
+
+    # Constraints
+    line_cont_realpower_max_pstve = "line_cont_realpower_max_pstve"
+    line_cont_realpower_max_ngtve = "line_cont_realpower_max_ngtve"
+    demand_real_alpha_controlled = "demand_real_alpha_controlled"
+    demand_alpha_max = "demand_alpha_max"
+    demand_alpha_fixneg = "demand_alpha_fixneg"
+    gen_uncontrollable_realpower_sp = "gen_uncontrollable_realpower_sp"
+    gen_mingen_LB = "gen_mingen_LB"
+    gen_individual_realpower_max = "gen_individual_realpower_max"
+    gen_individual_realpower_min = "gen_individual_realpower_min"
+    gen_prorata_realpower_max = "gen_prorata_realpower_max"
+    gen_prorata_realpower_min = "gen_prorata_realpower_min"
+    gen_prorata_realpower_min_zeta = "gen_prorata_realpower_min_zeta"
+    gen_prorata_zeta_max = "gen_prorata_zeta_max"
+    gen_prorata_zeta_min = "gen_prorata_zeta_min"
+    gen_prorata_zeta_binary = "gen_prorata_zeta_binary"
+    gen_LIFO_realpower_max = "gen_LIFO_realpower_max"
+    gen_LIFO_realpower_min = "gen_LIFO_realpower_min"
+    gen_LIFO_gamma = "gen_LIFO_gamma"
+    gen_LIFO_beta = "gen_LIFO_beta"
+    KCL_networked_realpower_noshunt = "KCL_networked_realpower_noshunt"
+    KVL_DCOPF_lines = "KVL_DCOPF_lines"
+    KVL_DCOPF_transformer = "KVL_DCOPF_transformer"
+    transf_continuous_real_max_pstve = "transf_continuous_real_max_pstve"
+    transf_continuous_real_max_ngtve = "transf_continuous_real_max_ngtve"
+    volts_line_delta = "volts_line_delta"
+    volts_transformer_delta = "volts_transformer_delta"
+    volts_reference_bus = "volts_reference_bus"
+
+
+@dataclass(slots=True)
+class SetDef:
+    index: Optional[Union[ComponentName, Tuple[ComponentName, ...], Any]] = None
+    within: Optional[Union[ComponentName, Tuple[ComponentName, ...], Any]] = None
+    initialize: Optional[Callable] = None
+    dimen: int = 1
+    ordered: bool = False
+
+
+@dataclass(slots=True)
+class VarDef:
+    index: Optional[Union[ComponentName, Tuple[ComponentName, ...], Any]] = None
+    domain: Any = None
+    bounds: Optional[Tuple[Any, Any]] = None
+    initialize: Optional[Callable] = None
+
+
+@dataclass(slots=True)
+class ParamDef:
+    index: Optional[Union[ComponentName, Tuple[ComponentName, ...], Any]] = None
+    within: Any = None
+    initialize: Optional[Callable] = None
+    mutable: bool = False
+
+
+@dataclass(slots=True)
+class ConstraintDef:
+    rule: Callable
+    index: Optional[Union[ComponentName, Tuple[ComponentName, ...], Any]] = None
+
+
+class Sets_Blocks:
+    def __init__(self, case: Any):
+        self.blocks: Dict[ComponentName, SetDef] = {
             # --- SETS FOR BUSSES ---
-            'B': {
-                'type': 'flat',
-                'index': None,
-                'within': None,
-                'dimen': 1,
-                'initialize': lambda: helpers.get_param_list(case, 'busses', 'name'),
-                'ordered': False
-            },
-            'b0': {
-                'type': 'flat',
-                'index': None,
-                'within': 'B',
-                'dimen': 1,
-                'initialize': lambda: helpers.get_param_list(case, 'busses', 'name', 'type', '=', 3),
-                'ordered': False
-            },
-            
+            ComponentName.B: SetDef(
+                initialize=lambda: helpers.get_param_list(case, "busses", "name"),
+            ),
+            ComponentName.b0: SetDef(
+                within=ComponentName.B,
+                initialize=lambda: helpers.get_param_list(
+                    case, "busses", "name", "type", "=", 3
+                ),
+            ),
+
             # --- SETS FOR GENERATORS ---
-            'G': {
-                'type': 'flat',
-                'index': None,
-                'within': None,
-                'dimen': 1,
-                'initialize': lambda: helpers.get_param_list(case, 'generators', 'name'),
-                'ordered': False
-            },
-            'generator_mapping': {
-                'type': 'indexed',
-                'index': 'B',
-                'within': None,
-                'dimen': 1,
-                'initialize': lambda: helpers.component_map_complete_dict(case,
-                                                                          'busses', 'name',
-                                                                          'generators', 'name',
-                                                                          'busname'),
-                'ordered': False
-            },
-            'G_LIFO': {
-                'type': 'flat',
-                'index': None,
-                'within': 'G',
-                'dimen': 1,
-                'initialize': lambda: helpers.get_param_list(case, 'generators', 'name', 'export_policy', '=', 'LIFO'),
-                'ordered': False
-            },
-            'G_LIFO_pairs': {
-                'type': 'flat',
-                'index': None,
-                'within': ('G_LIFO', 'G_LIFO'),
-                'dimen': 2,
-                'initialize': lambda: helpers.get_ordered_groupwise_combinations(case, 'generators', 'name', 'lifo_group', 'lifo_position'),
-                'ordered': True
-            },
-            'G_prorata': {
-                'type': 'flat',
-                'index': None,
-                'within': 'G',
-                'dimen': 1,
-                'initialize': lambda: helpers.get_param_list(case, 'generators','name', 'export_policy', '=', 'Pro-Rata'),
-                'ordered': False
-            },
-            'G_prorata_map': {
-                'type': 'indexed',
-                'index': 'G_prorata',
-                'within': None,
-                'dimen': 1,
-                'initialize': lambda: helpers.comma_param_to_dict(case, 'generators', 'name', 'prorata_groups', 'export_policy', '=', 'Pro-Rata'),
-                'ordered': False
-            },
-            'G_prorata_pairs': {
-                'type': 'flat',
-                'index': None,
-                'within': None,
-                'dimen': 2,
-                'initialize': lambda: helpers.get_paired_params_list(case, 'generators', 'name', 'prorata_groups', True,'export_policy', '=', 'Pro-Rata'),
-                'ordered': False
-            },
-            'G_individual': {
-                'type': 'flat',
-                'index': None,
-                'within': 'G',
-                'dimen': 1,
-                'initialize': lambda: helpers.get_param_list(case, 'generators', 'name', 'export_policy', '=', 'Individual'),
-                'ordered': False
-            },
-            'G_uncontrollable': {
-                'type': 'flat',
-                'index': None,
-                'within': 'G',
-                'dimen': 1,
-                'initialize': lambda: helpers.get_param_list(case, 'generators', 'name', 'export_policy', '=', 'Uncontrollable'),
-                'ordered': False
-            },
-            'G_s': {
-                'type': 'flat',
-                'index': None,
-                'within': 'G',
-                'dimen': 1,
-                'initialize': lambda: helpers.get_param_list(case, 'generators', 'name', 'synchronous', '=', 'Yes'),
-                'ordered': False
-            },
-            'G_ns': {
-                'type': 'flat',
-                'index': None,
-                'within': 'G',
-                'dimen': 1,
-                'initialize': lambda: helpers.get_param_list(case, 'generators', 'name', 'synchronous', '=', 'No'),
-                'ordered': False
-            },
-            'prorata_groups': {
-                'type': 'flat',
-                'index': None,
-                'within': None,
-                'dimen': 1,
-                'initialize': lambda: helpers.comma_param_to_list(case, 'generators', 'prorata_groups', 'export_policy', '=', 'Pro-Rata'),
-                'ordered': False
-            },
+            ComponentName.G: SetDef(
+                initialize=lambda: helpers.get_param_list(
+                    case, "generators", "name"
+                ),
+            ),
+            ComponentName.generator_mapping: SetDef(
+                index=ComponentName.B,
+                initialize=lambda: helpers.component_map_complete_dict(
+                    case,
+                    "busses",
+                    "name",
+                    "generators",
+                    "name",
+                    "busname",
+                ),
+            ),
+            ComponentName.G_LIFO: SetDef(
+                within=ComponentName.G,
+                initialize=lambda: helpers.get_param_list(
+                    case,
+                    "generators",
+                    "name",
+                    "export_policy",
+                    "=",
+                    "LIFO",
+                ),
+            ),
+            ComponentName.G_LIFO_pairs: SetDef(
+                within=(ComponentName.G_LIFO, ComponentName.G_LIFO),
+                initialize=lambda: helpers.get_ordered_groupwise_combinations(
+                    case, "generators", "name", "lifo_group", "lifo_position"
+                ),
+                dimen=2,
+                ordered=True,
+            ),
+            ComponentName.G_prorata: SetDef(
+                within=ComponentName.G,
+                initialize=lambda: helpers.get_param_list(
+                    case,
+                    "generators",
+                    "name",
+                    "export_policy",
+                    "=",
+                    "Pro-Rata",
+                ),
+            ),
+            ComponentName.G_prorata_map: SetDef(
+                index=ComponentName.G_prorata,
+                initialize=lambda: helpers.comma_param_to_dict(
+                    case,
+                    "generators",
+                    "name",
+                    "prorata_groups",
+                    "export_policy",
+                    "=",
+                    "Pro-Rata",
+                ),
+            ),
+            ComponentName.G_prorata_pairs: SetDef(
+                initialize=lambda: helpers.get_paired_params_list(
+                    case,
+                    "generators",
+                    "name",
+                    "prorata_groups",
+                    True,
+                    "export_policy",
+                    "=",
+                    "Pro-Rata",
+                ),
+                dimen=2,
+            ),
+            ComponentName.G_individual: SetDef(
+                within=ComponentName.G,
+                initialize=lambda: helpers.get_param_list(
+                    case,
+                    "generators",
+                    "name",
+                    "export_policy",
+                    "=",
+                    "Individual",
+                ),
+            ),
+            ComponentName.G_uncontrollable: SetDef(
+                within=ComponentName.G,
+                initialize=lambda: helpers.get_param_list(
+                    case,
+                    "generators",
+                    "name",
+                    "export_policy",
+                    "=",
+                    "Uncontrollable",
+                ),
+            ),
+            ComponentName.G_s: SetDef(
+                within=ComponentName.G,
+                initialize=lambda: helpers.get_param_list(
+                    case,
+                    "generators",
+                    "name",
+                    "synchronous",
+                    "=",
+                    "Yes",
+                ),
+            ),
+            ComponentName.G_ns: SetDef(
+                within=ComponentName.G,
+                initialize=lambda: helpers.get_param_list(
+                    case,
+                    "generators",
+                    "name",
+                    "synchronous",
+                    "=",
+                    "No",
+                ),
+            ),
+            ComponentName.prorata_groups: SetDef(
+                initialize=lambda: helpers.comma_param_to_list(
+                    case,
+                    "generators",
+                    "prorata_groups",
+                    "export_policy",
+                    "=",
+                    "Pro-Rata",
+                ),
+            ),
 
             # --- SETS FOR POWER LINES ---
-            'L': {
-                'type': 'flat',
-                'index': None,
-                'within': None,
-                'dimen': 1,
-                'initialize': lambda: helpers.get_param_list(case, 'branches', 'name'),
-                'ordered': False
-            },
-            'bus_line_in': {
-                'type': 'indexed',
-                'index': 'B',
-                'within': None,
-                'dimen': 1,
-                'initialize': lambda: helpers.component_map_complete_dict(case,
-                                                                          'busses', 'name',
-                                                                          'branches', 'name',
-                                                                          'to_busname'),
-                'ordered': False
-            },
-            'bus_line_out': {
-                'type': 'indexed',
-                'index': 'B',
-                'within': None,
-                'dimen': 1,
-                'initialize': lambda: helpers.component_map_complete_dict(case,
-                                                                          'busses', 'name',
-                                                                          'branches', 'name',
-                                                                          'from_busname'),
-                'ordered': False
-            },
-            'line_busses': {
-                'type': 'indexed',
-                'index': 'L',
-                'within': None,
-                'dimen': 1,
-                'initialize': lambda: helpers.get_zipped_param_list(case, 'branches', 'name', ['from_busname', 'to_busname']),
-                'ordered': True
-            },
+            ComponentName.L: SetDef(
+                initialize=lambda: helpers.get_param_list(
+                    case, "branches", "name"
+                ),
+            ),
+            ComponentName.bus_line_in: SetDef(
+                index=ComponentName.B,
+                initialize=lambda: helpers.component_map_complete_dict(
+                    case,
+                    "busses",
+                    "name",
+                    "branches",
+                    "name",
+                    "to_busname",
+                ),
+            ),
+            ComponentName.bus_line_out: SetDef(
+                index=ComponentName.B,
+                initialize=lambda: helpers.component_map_complete_dict(
+                    case,
+                    "busses",
+                    "name",
+                    "branches",
+                    "name",
+                    "from_busname",
+                ),
+            ),
+            ComponentName.line_busses: SetDef(
+                index=ComponentName.L,
+                initialize=lambda: helpers.get_zipped_param_list(
+                    case,
+                    "branches",
+                    "name",
+                    ["from_busname", "to_busname"],
+                ),
+                ordered=True,
+            ),
 
             # --- SETS FOR TRANSFORMERS ---
-            'TRANSF': {
-                'type': 'flat',
-                'index': None,
-                'within': None,
-                'dimen': 1,
-                'initialize': lambda: helpers.get_param_list(case, 'transformers', 'name'),
-                'ordered': False
-            },
-            'bus_transformer_in': {
-                'type': 'indexed',
-                'index': 'B',
-                'within': None,
-                'dimen': 1,
-                'initialize': lambda: helpers.component_map_complete_dict(case,
-                                                                          'busses', 'name',
-                                                                          'transformers', 'name',
-                                                                          'to_busname'),
-                'ordered': False
-            },
-            'bus_transformer_out': {
-                'type': 'indexed',
-                'index': 'B',
-                'within': None,
-                'dimen': 1,
-                'initialize': lambda: helpers.component_map_complete_dict(case,
-                                                                          'busses', 'name',
-                                                                          'transformers', 'name',
-                                                                          'from_busname'),
-                'ordered': False
-            },
-            'transformer_busses': {
-                'type': 'indexed',
-                'index': 'TRANSF',
-                'within': None,
-                'dimen': 1,
-                'initialize': lambda: helpers.get_zipped_param_list(case, 'transformers', 'name', ['from_busname', 'to_busname']),
-                'ordered': True
-            },
+            ComponentName.TRANSF: SetDef(
+                initialize=lambda: helpers.get_param_list(
+                    case, "transformers", "name"
+                ),
+            ),
+            ComponentName.bus_transformer_in: SetDef(
+                index=ComponentName.B,
+                initialize=lambda: helpers.component_map_complete_dict(
+                    case,
+                    "busses",
+                    "name",
+                    "transformers",
+                    "name",
+                    "to_busname",
+                ),
+            ),
+            ComponentName.bus_transformer_out: SetDef(
+                index=ComponentName.B,
+                initialize=lambda: helpers.component_map_complete_dict(
+                    case,
+                    "busses",
+                    "name",
+                    "transformers",
+                    "name",
+                    "from_busname",
+                ),
+            ),
+            ComponentName.transformer_busses: SetDef(
+                index=ComponentName.TRANSF,
+                initialize=lambda: helpers.get_zipped_param_list(
+                    case,
+                    "transformers",
+                    "name",
+                    ["from_busname", "to_busname"],
+                ),
+                ordered=True,
+            ),
 
             # --- SETS FOR DEMANDS ---
-            'D': {
-                'type': 'flat',
-                'index': None,
-                'within': None,
-                'dimen': 1,
-                'initialize': lambda: helpers.get_param_list(case, 'demands', 'name'),
-                'ordered': False
-            },
-            'DNeg': {
-                'type': 'flat',
-                'index': None,
-                'within': 'D',
-                'dimen': 1,
-                'initialize': lambda: helpers.get_param_list(case, 'demands','name', 'real', '<', 0),
-                'ordered': False
-            },
-            'demand_bus_mapping': {
-                'type': 'indexed',
-                'index': 'B',
-                'within': None,
-                'dimen': 1,
-                'initialize': lambda: helpers.component_map_complete_dict(case,
-                                                                          'busses', 'name',
-                                                                          'demands', 'name',
-                                                                          'busname'),
-                'ordered': False
-            }
+            ComponentName.D: SetDef(
+                initialize=lambda: helpers.get_param_list(
+                    case, "demands", "name"
+                ),
+            ),
+            ComponentName.DNeg: SetDef(
+                within=ComponentName.D,
+                initialize=lambda: helpers.get_param_list(
+                    case, "demands", "name", "real", "<", 0
+                ),
+            ),
+            ComponentName.demand_bus_mapping: SetDef(
+                index=ComponentName.B,
+                initialize=lambda: helpers.component_map_complete_dict(
+                    case,
+                    "busses",
+                    "name",
+                    "demands",
+                    "name",
+                    "busname",
+                ),
+            ),
         }
 
-class Params_Blocks():
-    def __init__(self, case, instance):
-        self.blocks = {
-            #LINE CONSTRAINTS#
-            'line_max_continuous_P': {
-                'index': instance.L,
-                'within': NonNegativeReals,
-                'initialize': lambda: helpers.get_PerUnit_param_dict(case, 'branches', 'name', 'ContinousRating', case.baseMVA),
-                'mutable': True
-            },
-            'line_susceptance': {
-                'index': instance.L,
-                'within': Reals,
-                'initialize': lambda: helpers.get_param_dict(case, 'branches', 'name', 'b'),
-                'mutable': False
-            },
-            'line_reactance': {
-                'index': instance.L,
-                'within': Reals,
-                'initialize': lambda: helpers.get_param_dict(case, 'branches', 'name', 'x'),
-                'mutable': False
-            },
 
-            #TRANSFORMER PARAMETERS
-            'transformer_max_continuous_P': {
-                'index': instance.TRANSF,
-                'within': NonNegativeReals,
-                'initialize': lambda: helpers.get_PerUnit_param_dict(case, 'transformers', 'name', 'ContinousRating', case.baseMVA),
-                'mutable': True
-            },
-            'transformer_susceptance': {
-                'index': instance.TRANSF,
-                'within': Reals,
-                'initialize': lambda: helpers.get_param_dict(case, 'transformers', 'name', 'b'),
-                'mutable': False
-            },
-            'transformer_reactance': {
-                'index': instance.TRANSF,
-                'within': Reals,
-                'initialize': lambda: helpers.get_param_dict(case, 'transformers', 'name', 'x'),
-                'mutable': False
-            },
+class Params_Blocks:
+    def __init__(self, case: Any):
+        self.blocks: Dict[ComponentName, ParamDef] = {
+            # LINE CONSTRAINTS
+            ComponentName.line_max_continuous_P: ParamDef(
+                index=ComponentName.L,
+                within=NonNegativeReals,
+                initialize=lambda: helpers.get_PerUnit_param_dict(
+                    case, "branches", "name", "ContinousRating", case.baseMVA
+                ),
+                mutable=True,
+            ),
+            ComponentName.line_susceptance: ParamDef(
+                index=ComponentName.L,
+                within=Reals,
+                initialize=lambda: helpers.get_param_dict(
+                    case, "branches", "name", "b"
+                ),
+                mutable=False,
+            ),
+            ComponentName.line_reactance: ParamDef(
+                index=ComponentName.L,
+                within=Reals,
+                initialize=lambda: helpers.get_param_dict(
+                    case, "branches", "name", "x"
+                ),
+                mutable=False,
+            ),
 
-            #DEMAND PARAMETERS
-            'PD': {
-                'index': instance.D,
-                'within': NonNegativeReals,
-                'initialize': lambda: helpers.get_PerUnit_param_dict(case, 'demands', 'name', 'real', case.baseMVA),
-                'mutable': True
-            },
-            'VOLL': {
-                'index': instance.D,
-                'within': Reals,
-                'initialize': lambda: helpers.get_param_dict(case, 'demands', 'name', 'VOLL'),
-                'mutable': True
-            },
+            # TRANSFORMER PARAMETERS
+            ComponentName.transformer_max_continuous_P: ParamDef(
+                index=ComponentName.TRANSF,
+                within=NonNegativeReals,
+                initialize=lambda: helpers.get_PerUnit_param_dict(
+                    case, "transformers", "name", "ContinousRating", case.baseMVA
+                ),
+                mutable=True,
+            ),
+            ComponentName.transformer_susceptance: ParamDef(
+                index=ComponentName.TRANSF,
+                within=Reals,
+                initialize=lambda: helpers.get_param_dict(
+                    case, "transformers", "name", "b"
+                ),
+                mutable=False,
+            ),
+            ComponentName.transformer_reactance: ParamDef(
+                index=ComponentName.TRANSF,
+                within=Reals,
+                initialize=lambda: helpers.get_param_dict(
+                    case, "transformers", "name", "x"
+                ),
+                mutable=False,
+            ),
 
-            #GENERATOR POWER PARAMETERS
-            'PGmax': {
-                'index': instance.G,
-                'within': Reals,
-                'initialize': lambda: helpers.get_PerUnit_param_dict(case, 'generators', 'name', 'PGUB', case.baseMVA),
-                'mutable': True
-            },
-            'PGmin': {
-                'index': instance.G,
-                'within': Reals,
-                'initialize': lambda: helpers.get_PerUnit_param_dict(case, 'generators', 'name', 'PGLB', case.baseMVA),
-                'mutable': True
-            },
-            'PGMINGEN': {
-                'index': instance.G,
-                'within': Reals,
-                'initialize': lambda: helpers.get_PerUnit_param_dict(case, 'generators', 'name', 'PGMINGEN', case.baseMVA),
-                'mutable': True
-            },
-        
-            #GENERATOR COST PARAMETERS
-            'c0': {
-                'index': instance.G,
-                'within': Reals,
-                'initialize': lambda: helpers.get_param_dict(case, 'generators', 'name', 'costc0'),
-                'mutable': False
-            },
-            'c1': {
-                'index': instance.G,
-                'within': Reals,
-                'initialize': lambda: helpers.get_param_dict(case, 'generators', 'name', 'costc1'),
-                'mutable': False
-            },
-            'bid': {
-                'index': instance.G,
-                'within': Reals,
-                'initialize': lambda: helpers.get_param_dict(case, 'generators', 'name', 'bid'),
-                'mutable': True
-            },
+            # DEMAND PARAMETERS
+            ComponentName.PD: ParamDef(
+                index=ComponentName.D,
+                within=NonNegativeReals,
+                initialize=lambda: helpers.get_PerUnit_param_dict(
+                    case, "demands", "name", "real", case.baseMVA
+                ),
+                mutable=True,
+            ),
+            ComponentName.VOLL: ParamDef(
+                index=ComponentName.D,
+                within=Reals,
+                initialize=lambda: helpers.get_param_dict(
+                    case, "demands", "name", "VOLL"
+                ),
+                mutable=True,
+            ),
 
-            #BASE MVA PARAMETER
-            'baseMVA': {
-                'index': instance.G,
-                'within': NonNegativeReals,
-                'initialize': lambda: case.baseMVA,
-                'mutable': False
-            }
+            # GENERATOR POWER PARAMETERS
+            ComponentName.PGmax: ParamDef(
+                index=ComponentName.G,
+                within=Reals,
+                initialize=lambda: helpers.get_PerUnit_param_dict(
+                    case, "generators", "name", "PGUB", case.baseMVA
+                ),
+                mutable=True,
+            ),
+            ComponentName.PGmin: ParamDef(
+                index=ComponentName.G,
+                within=Reals,
+                initialize=lambda: helpers.get_PerUnit_param_dict(
+                    case, "generators", "name", "PGLB", case.baseMVA
+                ),
+                mutable=True,
+            ),
+            ComponentName.PGMINGEN: ParamDef(
+                index=ComponentName.G,
+                within=Reals,
+                initialize=lambda: helpers.get_PerUnit_param_dict(
+                    case, "generators", "name", "PGMINGEN", case.baseMVA
+                ),
+                mutable=True,
+            ),
+
+            # GENERATOR COST PARAMETERS
+            ComponentName.c0: ParamDef(
+                index=ComponentName.G,
+                within=Reals,
+                initialize=lambda: helpers.get_param_dict(
+                    case, "generators", "name", "costc0"
+                ),
+                mutable=False,
+            ),
+            ComponentName.c1: ParamDef(
+                index=ComponentName.G,
+                within=Reals,
+                initialize=lambda: helpers.get_param_dict(
+                    case, "generators", "name", "costc1"
+                ),
+                mutable=False,
+            ),
+            ComponentName.bid: ParamDef(
+                index=ComponentName.G,
+                within=Reals,
+                initialize=lambda: helpers.get_param_dict(
+                    case, "generators", "name", "bid"
+                ),
+                mutable=True,
+            ),
+
+            # BASE MVA PARAMETER
+            ComponentName.baseMVA: ParamDef(
+                index=ComponentName.G,
+                within=NonNegativeReals,
+                initialize=lambda: case.baseMVA,
+                mutable=False,
+            ),
         }
 
-class Variables_Blocks():
-    def __init__(self, instance):
-        self.blocks = {
+
+class Variables_Blocks:
+    def __init__(self, instance: Any):
+        self.blocks: Dict[ComponentName, VarDef] = {
             #CONTROL VARIABLES
-            'pG': {
-                'index': instance.G,
-                'domain': Reals,
-                'bounds': None,
-                'initialize': None
-            },
-            'pD': {
-                'index': instance.D,
-                'domain': Reals,
-                'bounds': None,
-                'initialize': None
-            },
-            'alpha': {
-                'index': instance.D,
-                'domain': NonNegativeReals,
-                'bounds': None,
-                'initialize': None
-            },
+            ComponentName.pG: VarDef(
+                index=ComponentName.G,
+                domain=Reals,
+            ),
+            ComponentName.pD: VarDef(
+                index=ComponentName.D,
+                domain=Reals,
+            ),
+            ComponentName.alpha: VarDef(
+                index=ComponentName.D,
+                domain=NonNegativeReals,
+            ),
 
             #Pro-Rata Curtailment Control Variables
-            'zeta_cg': {
-                'index': instance.prorata_groups,
-                'domain': NonNegativeReals,
-                'bounds': (0, 1),
-                'initialize': None
-            },
-            'zeta_wind': {
-                'index': instance.G_prorata,
-                'domain': NonNegativeReals,
-                'bounds': (0, 1),
-                'initialize': None
-            },
-            'zeta_bin': {
-                'index': instance.G_prorata_pairs,
-                'domain': Binary,
-                'bounds': None,
-                'initialize': None
-            },
-            'minimum_zeta': {
-                'index': instance.G_prorata_pairs,
-                'domain': NonNegativeReals,
-                'bounds': (0, 1),
-                'initialize': None
-            },
+            ComponentName.zeta_cg: VarDef(
+                index=ComponentName.prorata_groups,
+                domain=NonNegativeReals,
+                bounds=(0, 1),
+            ),
+            ComponentName.zeta_wind: VarDef(
+                index=ComponentName.G_prorata,
+                domain=NonNegativeReals,
+                bounds=(0, 1),
+            ),
+            ComponentName.zeta_bin: VarDef(
+                index=ComponentName.G_prorata_pairs,
+                domain=Binary,
+            ),
+            ComponentName.minimum_zeta: VarDef(
+                index=ComponentName.G_prorata_pairs,
+                domain=NonNegativeReals,
+                bounds=(0, 1),
+            ),
 
             #LIFO Curtailment Control Variables
-            'gamma': { # indicator variable for wind curtailment on/off
-                'index': instance.G_LIFO,
-                'domain': Binary,
-                'bounds': None,
-                'initialize': None
-            },
-            'beta': { #continuous curtailment variable between 0 & 1
-                'index': instance.G_LIFO,
-                'domain': NonNegativeReals,
-                'bounds': (0, 1),
-                'initialize': None
-            },
+            ComponentName.gamma: VarDef(
+                index=ComponentName.G_LIFO,
+                domain=Binary,
+            ),
+            ComponentName.beta: VarDef(
+                index=ComponentName.G_LIFO,
+                domain=NonNegativeReals,
+                bounds=(0, 1),
+            ),
 
             #STATE VARIABLES
-            'deltaL': { #angle difference across lines
-                'index': instance.L,
-                'domain': Reals,
-                'bounds': None,
-                'initialize': None
-            },
-            'deltaLT': { #angle difference across transformers
-                'index': instance.TRANSF,
-                'domain': Reals,
-                'bounds': None,
-                'initialize': None
-            },
-            'delta': { #voltage phase angle at bus b, rad
-                'index': instance.B,
-                'domain': Reals,
-                'bounds': None,
-                'initialize': 0
-            },
-            'pL': { #real power injected at b onto line l, p.u.
-                'index': instance.L,
-                'domain': Reals,
-                'bounds': None,
-                'initialize': None
-            },
-            'pLT': { #real power injected at b onto line l, p.u.
-                'index': instance.TRANSF,
-                'domain': Reals,
-                'bounds': None,
-                'initialize': None
-            },
-        }    
+            ComponentName.deltaL: VarDef(
+                index=ComponentName.L,
+                domain=Reals,
+            ),
+            ComponentName.deltaLT: VarDef(
+                index=ComponentName.TRANSF,
+                domain=Reals,
+            ),
+            ComponentName.delta: VarDef(
+                index=ComponentName.B,
+                domain=Reals,
+                initialize=0,
+            ),
+            ComponentName.pL: VarDef(
+                index=ComponentName.L,
+                domain=Reals,
+            ),
+            ComponentName.pLT: VarDef(
+                index=ComponentName.TRANSF,
+                domain=Reals,
+            ),
+        }
 
-class Constraint_Blocks():
-    def __init__(self, instance):
-            
-        self.blocks = {
+
+class Constraint_Blocks:
+    def __init__(self, instance: Any):
+        self.blocks: Dict[ComponentName, ConstraintDef] = {
             # --- POWER LINE CONSTRAINTS ---
-            'line_cont_realpower_max_pstve': {
-                'rule': lambda instance, line: instance.pL[line] <= instance.line_max_continuous_P[line],
-                'index': instance.L
-            },
-            'line_cont_realpower_max_ngtve': {
-                'rule': lambda instance, line: instance.pL[line] >= -instance.line_max_continuous_P[line],
-                'index': instance.L
-            },
-            
-            # --- DEMAND CONSTRAINTS ---            
-            'demand_real_alpha_controlled': {
-                'rule': lambda instance, demand: instance.pD[demand] == instance.alpha[demand]*instance.PD[demand],
-                'index': instance.D
-            },
-            'demand_alpha_max': {
-                'rule': lambda instance, demand: instance.alpha[demand] <= 1,
-                'index': instance.D
-            },
-            'demand_alpha_fixneg': {
-                'rule': lambda instance, demand: instance.alpha[demand] == 1,
-                'index': instance.DNeg
-            },
+            ComponentName.line_cont_realpower_max_pstve: ConstraintDef(
+                index=ComponentName.L,
+                rule=lambda inst, line: inst.pL[line]
+                <= inst.line_max_continuous_P[line],
+            ),
+            ComponentName.line_cont_realpower_max_ngtve: ConstraintDef(
+                index=ComponentName.L,
+                rule=lambda inst, line: inst.pL[line]
+                >= -inst.line_max_continuous_P[line],
+            ),
+
+            # --- DEMAND CONSTRAINTS ---
+            ComponentName.demand_real_alpha_controlled: ConstraintDef(
+                index=ComponentName.D,
+                rule=lambda inst, demand: inst.pD[demand]
+                == inst.alpha[demand] * inst.PD[demand],
+            ),
+            ComponentName.demand_alpha_max: ConstraintDef(
+                index=ComponentName.D,
+                rule=lambda inst, demand: inst.alpha[demand] <= 1,
+            ),
+            ComponentName.demand_alpha_fixneg: ConstraintDef(
+                index=ComponentName.DNeg,
+                rule=lambda inst, demand: inst.alpha[demand] == 1,
+            ),
 
             #--- GENERATION CONSTRAINTS ---
-            # --- Uncontrollable EER Poliy ---
-              #Constrains output of each generator to equal to the setpoint. \n
-              #Should be defined against the set of uncontrollable generators (instance.G_uncontrollable)
-              
-            'gen_uncontrollable_realpower_sp': {
-                'rule': lambda instance, generator: instance.pG[generator] == instance.PG[generator],
-                'index': instance.G_uncontrollable
-            },
+            # --- Uncontrollable EER Policy ---
+            ComponentName.gen_uncontrollable_realpower_sp: ConstraintDef(
+                index=ComponentName.G_uncontrollable,
+                rule=lambda inst, generator: inst.pG[generator]
+                == inst.PG[generator],
+            ),
 
             # --- Mingen Requirements ---
-            #Constrains output of each generator to less than or equal to the maximum value. \n
-            #Should be defined against the set of individually curtailed generators (instance.G_individual)
-            'gen_mingen_LB': {
-                'rule': lambda instance, generator:  instance.pG[generator] >= instance.PGMINGEN[generator],
-                'index': instance.G
-            },
+            ComponentName.gen_mingen_LB: ConstraintDef(
+                index=ComponentName.G,
+                rule=lambda inst, generator: inst.pG[generator]
+                >= inst.PGMINGEN[generator],
+            ),
 
             # --- Individual EER Policy ---
-            #Constrains output of each generator to less than or equal to the maximum value. \n
-            #Should be defined against the set of individually curtailed generators (instance.G_individual)
-            'gen_individual_realpower_max': {
-                'rule': lambda instance, generator: instance.pG[generator] <= instance.PGmax[generator],
-                'index': instance.G_individual
-            },
-            'gen_individual_realpower_min': {
-                'rule': lambda instance, generator: instance.pG[generator] >= instance.PGmin[generator],
-                'index': instance.G_individual
-            },
+            ComponentName.gen_individual_realpower_max: ConstraintDef(
+                index=ComponentName.G_individual,
+                rule=lambda inst, generator: inst.pG[generator]
+                <= inst.PGmax[generator],
+            ),
+            ComponentName.gen_individual_realpower_min: ConstraintDef(
+                index=ComponentName.G_individual,
+                rule=lambda inst, generator: inst.pG[generator]
+                >= inst.PGmin[generator],
+            ),
 
             # --- Pro-Rata ERG Curtailment ---
-            'gen_prorata_realpower_max': {
-                'rule': lambda instance, generator: instance.pG[generator] <= instance.PGmax[generator] * instance.zeta_wind[generator],
-                'index': instance.G_prorata
-            },
-            'gen_prorata_realpower_min': {
-                'rule': lambda instance, generator: instance.pG[generator] >= instance.PGmin[generator],
-                'index': instance.G_prorata
-            },
-            'gen_prorata_realpower_min_zeta': {
-                'rule': lambda instance, generator: instance.pG[generator] >= instance.PGmax[generator] * instance.zeta_wind[generator],
-                'index': instance.G_prorata
-            },
-            'gen_prorata_zeta_max': {
-                'rule': lambda instance, generator, cg: instance.zeta_wind[generator] <=  instance.zeta_cg[cg],
-                'index': instance.G_prorata_pairs
-            },
-            'gen_prorata_zeta_min': {
-                'rule': lambda instance, generator, cg: instance.zeta_wind[generator] >= instance.zeta_cg[cg] - (1 - 0) * (1-instance.zeta_bin[(generator, cg)]),
-                'index': instance.G_prorata_pairs
-            },
-            'gen_prorata_zeta_binary': {
-                'rule': lambda instance, generator, cg: sum(instance.zeta_bin[(generator, cg)] for cg in instance.G_prorata_map[generator]) == 1,
-                'index': instance.G_prorata
-            },
+            ComponentName.gen_prorata_realpower_max: ConstraintDef(
+                index=ComponentName.G_prorata,
+                rule=lambda inst, generator: inst.pG[generator]
+                <= inst.PGmax[generator] * inst.zeta_wind[generator],
+            ),
+            ComponentName.gen_prorata_realpower_min: ConstraintDef(
+                index=ComponentName.G_prorata,
+                rule=lambda inst, generator: inst.pG[generator]
+                >= inst.PGmin[generator],
+            ),
+            ComponentName.gen_prorata_realpower_min_zeta: ConstraintDef(
+                index=ComponentName.G_prorata,
+                rule=lambda inst, generator: inst.pG[generator]
+                >= inst.PGmax[generator] * inst.zeta_wind[generator],
+            ),
+            ComponentName.gen_prorata_zeta_max: ConstraintDef(
+                index=ComponentName.G_prorata_pairs,
+                rule=lambda inst, generator, cg: inst.zeta_wind[generator]
+                <= inst.zeta_cg[cg],
+            ),
+            ComponentName.gen_prorata_zeta_min: ConstraintDef(
+                index=ComponentName.G_prorata_pairs,
+                rule=lambda inst, generator, cg: inst.zeta_wind[generator]
+                >= inst.zeta_cg[cg] - (1 - 0) * (1 - inst.zeta_bin[(generator, cg)]),
+            ),
+            ComponentName.gen_prorata_zeta_binary: ConstraintDef(
+                index=ComponentName.G_prorata,
+                rule=lambda inst, generator: sum(
+                    inst.zeta_bin[(generator, cg)]
+                    for cg in inst.G_prorata_map[generator]
+                )
+                == 1,
+            ),
 
             # --- Last-In-First-Out (LIFT) ERG Curtailment ---
-            'gen_LIFO_realpower_max': {
-                'rule': lambda instance, generator: instance.pG[generator] <= (1 - instance.beta[generator]) * instance.PGmax[generator],
-                'index': instance.G_LIFO
-            },
-            'gen_LIFO_realpower_min': {
-                'rule': lambda instance, generator: instance.pG[generator] >= (1-instance.gamma[generator])*instance.PGmax[generator],
-                'index': instance.G_LIFO
-            },
-            'gen_LIFO_gamma': {
-                'rule': lambda instance, gen1, gen2: instance.gamma[gen1] <= instance.gamma[gen2],
-                'index': instance.G_LIFO_pairs
-            },
-            'gen_LIFO_beta': {
-                'rule': lambda instance, gen1, gen2: instance.gamma[gen1] <= instance.beta[gen2],
-                'index': instance.G_LIFO_pairs
-            },
+            ComponentName.gen_LIFO_realpower_max: ConstraintDef(
+                index=ComponentName.G_LIFO,
+                rule=lambda inst, generator: inst.pG[generator]
+                <= (1 - inst.beta[generator]) * inst.PGmax[generator],
+            ),
+            ComponentName.gen_LIFO_realpower_min: ConstraintDef(
+                index=ComponentName.G_LIFO,
+                rule=lambda inst, generator: inst.pG[generator]
+                >= (1 - inst.gamma[generator]) * inst.PGmax[generator],
+            ),
+            ComponentName.gen_LIFO_gamma: ConstraintDef(
+                index=ComponentName.G_LIFO_pairs,
+                rule=lambda inst, gen1, gen2: inst.gamma[gen1]
+                <= inst.gamma[gen2],
+            ),
+            ComponentName.gen_LIFO_beta: ConstraintDef(
+                index=ComponentName.G_LIFO_pairs,
+                rule=lambda inst, gen1, gen2: inst.gamma[gen1]
+                <= inst.beta[gen2],
+            ),
 
             # --- KCL CONSTRAINTS ---
-            'KCL_networked_realpower_noshunt': {
-                'rule': lambda instance, bus: + sum(instance.pG[generator] for generator in instance.generator_mapping[bus])\
-                                                        - sum(instance.pL[line] for line in instance.bus_line_out[bus])\
-                                                        + sum(instance.pL[line] for line in instance.bus_line_in[bus])\
-                                                        - sum(instance.pLT[transformer] for transformer in instance.bus_transformer_out[bus])\
-                                                        +sum(instance.pLT[transformer] for transformer in instance.bus_transformer_in[bus])\
-                                                        ==\
-                                                        sum(instance.pD[demand] for demand in instance.demand_bus_mapping[bus]),
-                'index': instance.B
-            },
-            # 'KCL_networked_realpower_withshunt': {
-            #     'rule': lambda instance, bus: + sum(instance.pG[generator] for generator in instance.generator_mapping[bus])\
-            #                                         - sum(instance.pL[line] for line in instance.bus_line_out[bus])\
-            #                                         + sum(instance.pL[line] for line in instance.bus_line_in[bus])\
-            #                                         - sum(instance.pLT[transformer] for transformer in instance.bus_transformer_out[bus])\
-            #                                         +sum(instance.pLT[transformer] for transformer in instance.bus_transformer_in[bus])\
-            #                                         ==\
-            #                                         sum(instance.pD[demand] for demand in instance.demand_bus_mapping[bus]) +\
-            #                                         sum(instance.GB[s] for s in instance.SHUNT if (bus,s) in instance.SHUNTbs),
-            #     'index': instance.B
-            # },
+            ComponentName.KCL_networked_realpower_noshunt: ConstraintDef(
+                index=ComponentName.B,
+                rule=lambda inst, bus: + sum(
+                    inst.pG[generator]
+                    for generator in inst.generator_mapping[bus]
+                )
+                - sum(inst.pL[line] for line in inst.bus_line_out[bus])
+                + sum(inst.pL[line] for line in inst.bus_line_in[bus])
+                - sum(
+                    inst.pLT[transformer]
+                    for transformer in inst.bus_transformer_out[bus]
+                )
+                + sum(
+                    inst.pLT[transformer]
+                    for transformer in inst.bus_transformer_in[bus]
+                )
+                == sum(
+                    inst.pD[demand]
+                    for demand in inst.demand_bus_mapping[bus]
+                ),
+            ),
 
-            # --- KVL CONSTRAINTS---       
-            'KVL_DCOPF_lines': {
-                'rule': lambda instance, line: instance.pL[line] == (1/instance.line_reactance[line])*instance.deltaL[line],
-                'index': instance.L
-            },
-            'KVL_DCOPF_transformer': {
-                'rule': lambda instance, transformer: instance.pLT[transformer] == (1/instance.transformer_reactance[transformer])*instance.deltaLT[transformer],
-                'index': instance.TRANSF
-            },
+            # --- KVL CONSTRAINTS---
+            ComponentName.KVL_DCOPF_lines: ConstraintDef(
+                index=ComponentName.L,
+                rule=lambda inst, line: inst.pL[line]
+                == (1 / inst.line_reactance[line]) * inst.deltaL[line],
+            ),
+            ComponentName.KVL_DCOPF_transformer: ConstraintDef(
+                index=ComponentName.TRANSF,
+                rule=lambda inst, transformer: inst.pLT[transformer]
+                == (1 / inst.transformer_reactance[transformer])
+                * inst.deltaLT[transformer],
+            ),
 
             # --- TRANSFORMER CONSTRAINTS---
-            'transf_continuous_real_max_pstve': {
-                'rule': lambda instance, transformer: instance.pLT[transformer] <= instance.transformer_max_continuous_P[transformer],
-                'index': instance.TRANSF
-            },
-            'transf_continuous_real_max_ngtve': {
-                'rule': lambda instance, transformer: instance.pLT[transformer] >= -instance.transformer_max_continuous_P[transformer],
-                'index': instance.TRANSF
-            },
+            ComponentName.transf_continuous_real_max_pstve: ConstraintDef(
+                index=ComponentName.TRANSF,
+                rule=lambda inst, transformer: inst.pLT[transformer]
+                <= inst.transformer_max_continuous_P[transformer],
+            ),
+            ComponentName.transf_continuous_real_max_ngtve: ConstraintDef(
+                index=ComponentName.TRANSF,
+                rule=lambda inst, transformer: inst.pLT[transformer]
+                >= -inst.transformer_max_continuous_P[transformer],
+            ),
 
-            # --- VOLTAGE CONSTRAINTS---      
-            'volts_line_delta': {
-                'rule': lambda instance, line: instance.deltaL[line] == \
-                                                    + instance.delta[instance.line_busses[line].at(1)]\
-                                                    - instance.delta[instance.line_busses[line].at(2)],
-                'index': instance.L
-            },
-            'volts_transformer_delta': {
-                'rule': lambda instance, transformer: instance.deltaLT[transformer] == \
-                                                            + instance.delta[instance.transformer_busses[transformer].at(1)]\
-                                                            - instance.delta[instance.transformer_busses[transformer].at(2)],
-                'index': instance.TRANSF
-            },
-            'volts_reference_bus': {
-                'rule': lambda instance, bus: instance.delta[bus]==0,
-                'index': instance.B
-            },
+            # --- VOLTAGE CONSTRAINTS---
+            ComponentName.volts_line_delta: ConstraintDef(
+                index=ComponentName.L,
+                rule=lambda inst, line: inst.deltaL[line]
+                == + inst.delta[inst.line_busses[line].at(1)]
+                - inst.delta[inst.line_busses[line].at(2)],
+            ),
+            ComponentName.volts_transformer_delta: ConstraintDef(
+                index=ComponentName.TRANSF,
+                rule=lambda inst, transformer: inst.deltaLT[transformer]
+                == + inst.delta[
+                    inst.transformer_busses[transformer].at(1)
+                ]
+                - inst.delta[
+                    inst.transformer_busses[transformer].at(2)
+                ],
+            ),
+            ComponentName.volts_reference_bus: ConstraintDef(
+                index=ComponentName.B,
+                rule=lambda inst, bus: inst.delta[bus] == 0,
+            ),
         }
+
 
