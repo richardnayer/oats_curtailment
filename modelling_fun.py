@@ -93,10 +93,10 @@ snapshot_DCOPF_network_constraints = [
 ]
 
 snapshot_DCOPF_LIFO_constraints = [
-  "gen_PGmaxC_LIFO",
-  "gen_PGminC_LIFO",
-  "gen_gamma_LIFO",
-  "gen_beta_LIFO",
+  "gen_LIFO_realpower_max",
+  "gen_LIFO_realpower_min",
+  "gen_LIFO_gamma",
+  "gen_LIFO_beta",
 ]
 
 snapshot_DCOPF_prorata_constraints = [
