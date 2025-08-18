@@ -16,6 +16,7 @@ import logging
 from enum import Enum
 
 from pyomo.environ import *  # noqa: F401,F403 - re-export Pyomo classes
+from .names import ComponentName
 
 # Set up logger
 logger = logging.getLogger(__name__)
@@ -35,12 +36,14 @@ def _initialize_resolver(defined_initialize: Any) -> Any:
     return defined_initialize
 
 
-def _resolve_component(instance: Any, source: Any) -> Any:
+def _resolve_component(
+    instance: Any, source: ComponentName | Enum | str | Any
+) -> Any:
     """Return a component from ``instance`` based on ``source``.
 
-    ``source`` may be an :class:`Enum` member, an object with a ``name``
-    attribute (e.g., a dataclass describing a component) or a raw string.  Any
-    other object is returned unchanged.
+    ``source`` may be a :class:`ComponentName`, any other :class:`Enum`
+    member, an object with a ``name`` attribute (e.g., a dataclass describing
+    a component) or a raw string. Any other object is returned unchanged.
     """
 
     if isinstance(source, Enum):
