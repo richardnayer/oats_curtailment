@@ -152,7 +152,7 @@ def add_variables_to_instance(instance:object, variable_dict_obj: dict, variable
             )
 
         else:
-            component = Set(
+            component = Var(
                 domain = domain,
                 bounds = bounds,
                 initialize=initialize,
