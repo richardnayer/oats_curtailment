@@ -6,6 +6,7 @@ import numpy as np
 from pyomo.environ import *
 from .names import ComponentName
 
+### Create Dataclasses for Sets, Vars, Params, Constraints & Objective Definition
 
 @dataclass(slots=True)
 class SetDef:
@@ -39,14 +40,17 @@ class ObjectiveDef:
     rule: Callable
     sense: object = minimize
 
+### Dictionary objects containing all components for a pyomo model
 
 class Sets_Blocks:
     def __init__(self, case: Any):
         self.blocks: Dict[ComponentName, SetDef] = {
             # --- SETS FOR BUSSES ---
+            # Set of busses
             ComponentName.B: SetDef(
                 initialize=lambda: helpers.get_param_list(case, "busses", "name"),
             ),
+            # -> Set of slack bus (i.e. fixed voltage bus)
             ComponentName.b0: SetDef(
                 within=ComponentName.B,
                 initialize=lambda: helpers.get_param_list(
@@ -55,11 +59,13 @@ class Sets_Blocks:
             ),
 
             # --- SETS FOR GENERATORS ---
+            # -> Set of all generators
             ComponentName.G: SetDef(
                 initialize=lambda: helpers.get_param_list(
                     case, "generators", "name"
                 ),
             ),
+            # -> Set mapping all generators to a bus, results in a dictionary of bus with a list of attached generators
             ComponentName.generator_mapping: SetDef(
                 index=ComponentName.B,
                 initialize=lambda: helpers.component_map_complete_dict(
@@ -71,6 +77,7 @@ class Sets_Blocks:
                     "busname",
                 ),
             ),
+            # -> Set of all generators with an export policy of LIFO
             ComponentName.G_LIFO: SetDef(
                 within=ComponentName.G,
                 initialize=lambda: helpers.get_param_list(
@@ -82,6 +89,7 @@ class Sets_Blocks:
                     "LIFO",
                 ),
             ),
+            # -> Set containing an ordered groupwise combination of all generators within a LIFO group
             ComponentName.G_LIFO_pairs: SetDef(
                 within=(ComponentName.G_LIFO, ComponentName.G_LIFO),
                 initialize=lambda: helpers.get_ordered_groupwise_combinations(
@@ -90,6 +98,7 @@ class Sets_Blocks:
                 dimen=2,
                 ordered=True,
             ),
+            # -> Set of all generators with an export policy of 'pro-rata'
             ComponentName.G_prorata: SetDef(
                 within=ComponentName.G,
                 initialize=lambda: helpers.get_param_list(
@@ -101,6 +110,7 @@ class Sets_Blocks:
                     "Pro-Rata",
                 ),
             ),
+            # -> Set mapping generators to pro-rata groups
             ComponentName.G_prorata_map: SetDef(
                 index=ComponentName.G_prorata,
                 initialize=lambda: helpers.comma_param_to_dict(
@@ -113,6 +123,7 @@ class Sets_Blocks:
                     "Pro-Rata",
                 ),
             ),
+            # -> Set containing pairs of generators within a pro-rata group
             ComponentName.G_prorata_pairs: SetDef(
                 initialize=lambda: helpers.get_paired_params_list(
                     case,
@@ -126,6 +137,7 @@ class Sets_Blocks:
                 ),
                 dimen=2,
             ),
+            # -> Set of all generators with an export policy of 'Individual'
             ComponentName.G_individual: SetDef(
                 within=ComponentName.G,
                 initialize=lambda: helpers.get_param_list(
@@ -137,6 +149,7 @@ class Sets_Blocks:
                     "Individual",
                 ),
             ),
+            # -> Set of all generators with an export policy of 'Uncontrollable'
             ComponentName.G_uncontrollable: SetDef(
                 within=ComponentName.G,
                 initialize=lambda: helpers.get_param_list(
@@ -148,6 +161,7 @@ class Sets_Blocks:
                     "Uncontrollable",
                 ),
             ),
+            # -> Set of all generators with synchronous = Yes
             ComponentName.G_s: SetDef(
                 within=ComponentName.G,
                 initialize=lambda: helpers.get_param_list(
@@ -159,6 +173,7 @@ class Sets_Blocks:
                     "Yes",
                 ),
             ),
+            # -> Set of all generators with synchronous = No
             ComponentName.G_ns: SetDef(
                 within=ComponentName.G,
                 initialize=lambda: helpers.get_param_list(
@@ -170,6 +185,7 @@ class Sets_Blocks:
                     "No",
                 ),
             ),
+            # -> Set of all pro-rata groups defined
             ComponentName.prorata_groups: SetDef(
                 initialize=lambda: helpers.comma_param_to_list(
                     case,

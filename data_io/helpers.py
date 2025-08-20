@@ -269,7 +269,7 @@ def get_zipped_param_list(case: object, component: str, index: str, zip_params: 
     return dict(zip(filtered_df[index] , zip(*(filtered_df[param] for param in zip_params))))
 
 def get_paired_params_list(case, component, param_1, param_2, param_2_comma = False, filter_param: Union[str, float, int] = None, operation: str = None, filter_value: Union[str, float,int] = None):
-    '''Return list of components filtered by a parameter'''
+    '''Return a list of pairs of all parameters'''
 
     #Check if component exists
     if not hasattr(case, component):
