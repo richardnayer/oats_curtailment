@@ -15,6 +15,7 @@ from typing import Any, Iterable
 from types import SimpleNamespace
 import inspect
 import logging
+import numpy as np
 from enum import Enum
 
 from pyomo.environ import *  # noqa: F401,F403 - re-export Pyomo classes
@@ -43,7 +44,6 @@ def _initialize_resolver(defined_initialize: Any) -> Any:
         return defined_initialize() if len(sig.parameters) == 0 else defined_initialize
     return defined_initialize
 
-
 def _resolve_component(
     instance: Any, source: ComponentName | Enum | str | Any
 ) -> Any:
@@ -68,7 +68,6 @@ def _resolve_component(
             return source
     return source
 
-
 def _index_resolver(instance: Any, defined_index: Any) -> Any:
     """Resolve index definitions into Pyomo objects."""
 
@@ -78,7 +77,6 @@ def _index_resolver(instance: Any, defined_index: Any) -> Any:
         resolved = [_resolve_component(instance, idx) for idx in defined_index]
         return reduce(mul, resolved)
     return _resolve_component(instance, defined_index)
-
 
 def _within_resolver(instance: Any, defined_within: Any) -> Any:
     """Resolve within definitions into Pyomo sets."""
@@ -90,12 +88,10 @@ def _within_resolver(instance: Any, defined_within: Any) -> Any:
         return reduce(mul, resolved)
     return _resolve_component(instance, defined_within)
 
-
 def _name_to_str(name_obj: Any) -> str:
     """Convert a dataclass or Enum ``name`` attribute to a string."""
 
     return name_obj.value if isinstance(name_obj, Enum) else str(name_obj)
-
 
 def add_sets_to_instance(instance: Any, set_defs: Iterable[Any]) -> None:
     """Add sets defined by dataclass objects to a model instance."""
@@ -117,7 +113,6 @@ def add_sets_to_instance(instance: Any, set_defs: Iterable[Any]) -> None:
             logger.info(f"Deleted and redefined set component {name_str}")
         instance.add_component(name_str, component)
 
-
 def add_params_to_instance(instance: Any, param_defs: Iterable[Any]) -> None:
     """Add parameters defined by dataclass objects to a model instance."""
 
@@ -137,7 +132,6 @@ def add_params_to_instance(instance: Any, param_defs: Iterable[Any]) -> None:
             instance.del_component(getattr(instance, name_str))
             logger.info(f"Deleted and redefined parameter component {name_str}")
         instance.add_component(name_str, component)
-
 
 def add_variables_to_instance(instance: Any, variable_defs: Iterable[Any]) -> None:
     """Add variables defined by dataclass objects to a model instance."""
@@ -159,7 +153,6 @@ def add_variables_to_instance(instance: Any, variable_defs: Iterable[Any]) -> No
             logger.info(f"Deleted and redefined variable component {name_str}")
         instance.add_component(name_str, component)
 
-
 def add_constraints_to_instance(instance: Any, constraint_defs: Iterable[Any]) -> None:
     """Add constraints defined by dataclass objects to a model instance."""
 
@@ -178,7 +171,6 @@ def add_constraints_to_instance(instance: Any, constraint_defs: Iterable[Any]) -
             logger.info(f"Deleted and redefined constraint component {name_str}")
         instance.add_component(name_str, component)
 
-
 def remove_component_from_instance(instance: Any, component_list: Iterable[str]) -> None:
     """Remove components from a model instance."""
 
@@ -189,6 +181,23 @@ def remove_component_from_instance(instance: Any, component_list: Iterable[str])
             raise KeyError(
                 f"Set '{name}' cannot be deleted as it does not exist in the instance"
             )
+
+def dcopf_marginal_cost_objective(instance):
+    '''
+    Objective function for marginal costs: \n
+     - Linear Generator Costs (c0 + c1), peturbed by random value between [0,1) to break symmetry
+     - Value of Lost Load of Demands
+     - Bid Price of Wind against total
+     - TAKE CARE: Power variables are still in p.u, scaled by baseMVA. Therefore
+        resulting obj will also be scaled by baseMVA. Variables not re-scaled here
+        in cost function to avoid numerical trouble in solver
+    '''
+    rnd = np.random.default_rng(100)
+
+    obj = sum((instance.c1[g]+rnd.random())*instance.pG[g]+(instance.c0[g]/instance.baseMVA) for g in instance.G) +\
+          sum(instance.VOLL[d]*(1-instance.alpha[d])*instance.PD[d] for d in instance.D)+ \
+          sum(instance.bid[g] * (instance.PGmax[g]-instance.pG[g]) for g in instance.G)
+    return obj
 
 
 # --- Snapshot DCOPF component groups -------------------------------------
