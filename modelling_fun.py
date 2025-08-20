@@ -6,6 +6,7 @@ from pyomo_models.build.functions import (
     build_snapshot_dcopf_variables,
 )
 import data_io.load_case as load_case
+import pyomo_models.pyosolve as pyosolve
 
 
 case = load_case.Case()
@@ -17,5 +18,8 @@ build_snapshot_dcopf_sets(instance, case)
 build_snapshot_dcopf_params(instance, case)
 build_snapshot_dcopf_variables(instance)
 build_snapshot_dcopf_constraints(instance)
+result = pyosolve.solveinstance(instance, solver="appsi_highs")
 
+
+...
 # Further model processing would continue here
