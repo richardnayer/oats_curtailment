@@ -56,13 +56,16 @@ def _resolve_component(
 
     if isinstance(source, Enum):
         return getattr(instance, source.value)
+    if isinstance(source, str):
+        return getattr(instance, source)
     if hasattr(source, "name"):
         name = getattr(source, "name")
         if isinstance(name, Enum):
             name = name.value
-        return getattr(instance, name)
-    if isinstance(source, str):
-        return getattr(instance, source)
+        try:
+            return getattr(instance, name)
+        except AttributeError:
+            return source
     return source
 
 
