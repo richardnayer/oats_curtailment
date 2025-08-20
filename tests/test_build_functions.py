@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-from enum import Enum
 from typing import Any, Callable
 
 import pytest
@@ -13,19 +12,12 @@ from pyomo_models.build.functions import (
     add_sets_to_instance,
     add_variables_to_instance,
 )
-
-
-class Names(Enum):
-    A = "A"
-    B = "B"
-    P = "P"
-    X = "X"
-    C = "C"
+from pyomo_models.build.names import ComponentName
 
 
 @dataclass
 class SetDefDC:
-    name: Names
+    name: ComponentName
     index: Any = None
     within: Any = None
     initialize: Any = None
@@ -34,7 +26,7 @@ class SetDefDC:
 
 @dataclass
 class ParamDefDC:
-    name: Names
+    name: ComponentName
     index: Any = None
     within: Any = None
     initialize: Any = None
@@ -43,7 +35,7 @@ class ParamDefDC:
 
 @dataclass
 class VarDefDC:
-    name: Names
+    name: ComponentName
     index: Any = None
     domain: Any = None
     bounds: tuple | None = None
@@ -52,7 +44,7 @@ class VarDefDC:
 
 @dataclass
 class ConstraintDefDC:
-    name: Names
+    name: ComponentName
     index: Any = None
     rule: Callable | None = None
 
@@ -60,34 +52,38 @@ class ConstraintDefDC:
 def test_build_helpers_accept_dataclasses_and_enums():
     model = ConcreteModel()
 
-    set_a = SetDefDC(name=Names.A, initialize=[1, 2])
-    set_b = SetDefDC(name=Names.B, within=set_a, initialize=[1])
+    set_a = SetDefDC(name=ComponentName.B, initialize=[1, 2])
+    set_b = SetDefDC(name=ComponentName.G, within=set_a, initialize=[1])
     add_sets_to_instance(model, [set_a, set_b])
 
-    assert sorted(model.A.data()) == [1, 2]
-    assert sorted(model.B.data()) == [1]
-    assert model.B.domain is model.A
+    assert sorted(model.B.data()) == [1, 2]
+    assert sorted(model.G.data()) == [1]
+    assert model.G.domain is model.B
 
-    param_p = ParamDefDC(name=Names.P, index=set_a, initialize={1: 10, 2: 20})
+    param_p = ParamDefDC(name=ComponentName.PD, index=set_a, initialize={1: 10, 2: 20})
     add_params_to_instance(model, [param_p])
-    assert model.P[1] == 10
-    assert model.P.index_set() is model.A
+    assert model.PD[1] == 10
+    assert model.PD.index_set() is model.B
 
     var_x = VarDefDC(
-        name=Names.X,
+        name=ComponentName.pG,
         index=set_a,
         domain=NonNegativeReals,
         initialize=5,
     )
     add_variables_to_instance(model, [var_x])
-    assert model.X[1].value == 5
-    assert model.X.index_set() is model.A
+    assert model.pG[1].value == 5
+    assert model.pG.index_set() is model.B
 
     def rule(m, i):
-        return m.X[i] >= m.P[i]
+        return m.pG[i] >= m.PD[i]
 
-    constraint_c = ConstraintDefDC(name=Names.C, index=Names.A, rule=rule)
+    constraint_c = ConstraintDefDC(
+        name=ComponentName.line_cont_realpower_max_pstve,
+        index=ComponentName.B,
+        rule=rule,
+    )
     add_constraints_to_instance(model, [constraint_c])
-    assert len(model.C) == 2
-    assert model.C.index_set() is model.A
+    assert len(model.line_cont_realpower_max_pstve) == 2
+    assert model.line_cont_realpower_max_pstve.index_set() is model.B
 
