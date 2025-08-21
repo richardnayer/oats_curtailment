@@ -242,7 +242,6 @@ class Case(UserDict):
         #Parse all sheets into dataframe and add to self
         self._sheet_parser(excel_file, sheet_config)
 
-
     def _set_baseMVA(self) -> float:
         if len(self.baseMVA['baseMVA']) > 1:
             raise Exception("More than one base MVA defined")

@@ -2,7 +2,7 @@
 from pyomo_models.build.definitions import *
 from pyomo_models.build.build_functions import *
 from pyomo_models.build.names import *
-import data_io.load_case as load_case
+import data_io.pyomo_io as pyomo_io
 import pyomo_models.build.pyosolve as pyosolve
 from pyomo_models.build.obj_functions import dcopf_marginal_cost_objective
 
@@ -141,6 +141,18 @@ def dcopf_snaphot(case: object):
     #Define Objective Function
     instance.OBJ = Objective(rule = dcopf_marginal_cost_objective(instance), sense=minimize)
 
+    #Solve Instance
     result = pyosolve.solveinstance(instance, solver="appsi_highs")
+
+    #Define Data to Save
+    data_to_cache = {"Var": [], 
+                "Param" : [],
+                "Set" : []}
     
-    return instance, result
+    output = pyomo_io.InstanceCache(instance, result, data_to_cache)
+    output.set(instance)
+    output.var(instance)
+    output.param(instance)
+    output.obj_value(instance)
+
+    return output, result

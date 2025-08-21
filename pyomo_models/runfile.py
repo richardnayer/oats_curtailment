@@ -20,9 +20,9 @@ def run_model(testcase = "end-to-end-testcase.xlsx", solver = "appsi_highs", mod
     match model:
         case 'DCOPF':
 
-            instance, result = dcopf_model.dcopf_snaphot(case)
-            return instance, result
+            output, result = dcopf_model.dcopf_snaphot(case)
+            return output, result
 
-instance, result = run_model()
+output, result = run_model()
 ...
 
