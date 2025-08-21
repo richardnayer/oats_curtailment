@@ -1,3 +1,4 @@
+
 from pyomo_models.build.definitions import *
 from pyomo_models.build.build_functions import *
 from pyomo_models.build.names import *
@@ -6,7 +7,7 @@ import pyomo_models.build.pyosolve as pyosolve
 from pyomo_models.build.obj_functions import dcopf_marginal_cost_objective
 
 
-def dcopf_snaphot(case: object) -> pyomo.result:
+def dcopf_snaphot(case: object):
     #Create Model & Instance
     model = AbstractModel()
     instance = model.create_instance()
@@ -128,18 +129,18 @@ def dcopf_snaphot(case: object) -> pyomo.result:
     #Define list of constraints to be aplied across generators, depending on types of export control defined, and add to model
     constraintlist_gen = []
     if [g for g in instance.G_LIFO] != []:
-        constraints_list += constraintlist_get_LIFO
+        constraintlist_gen += constraintlist_get_LIFO
     if [g for g in instance.G_prorata] != []:
-        constraints_list += constraintlist_gen_prorata
+        constraintlist_gen += constraintlist_gen_prorata
     if [g for g in instance.G_individual] != []:
-        constraints_list += constraintlist_gen_individual
+        constraintlist_gen += constraintlist_gen_individual
     if [g for g in instance.G_uncontrollable] != []:
-        constraints_list += constraintlist_gen_uncontrollable
-    add_constraints_to_instance(instance, constraintlist_gen)
+        constraintlist_gen += constraintlist_gen_uncontrollable
+    build_constraints(instance, constraintlist_gen)
 
     #Define Objective Function
     instance.OBJ = Objective(rule = dcopf_marginal_cost_objective(instance), sense=minimize)
 
     result = pyosolve.solveinstance(instance, solver="appsi_highs")
     
-    return result
+    return instance, result

@@ -1,11 +1,12 @@
-from build.definitions import *
-from build.build_functions import *
-from build.names import *
-import data_io.load_case as load_case
-import build.pyosolve as pyosolve
-import models.dcopf as dcopf_model
+#Set Path
+from pathlib import Path
+import sys
+path_root = Path(__file__).parents[1]
+sys.path.append(str(path_root))
 
-#Load Case
+#Import Modules
+import data_io.load_case as load_case
+import pyomo_models.models.dcopf as dcopf_model
 
 
 def run_model(testcase = "end-to-end-testcase.xlsx", solver = "appsi_highs", model="DCOPF"):
@@ -19,8 +20,9 @@ def run_model(testcase = "end-to-end-testcase.xlsx", solver = "appsi_highs", mod
     match model:
         case 'DCOPF':
 
-            result = dcopf_model.dcopf_snaphot(case)
-            ...
+            instance, result = dcopf_model.dcopf_snaphot(case)
+            return instance, result
 
-    
+instance, result = run_model()
+...
 
