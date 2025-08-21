@@ -182,35 +182,35 @@ def remove_component_from_instance(instance: Any, component_list: Iterable[str])
                 f"Set '{name}' cannot be deleted as it does not exist in the instance"
             )
 
-def build_sets(instance: Any, case: Any, SetList: Iterable[Any]) -> Any:
-    """Populate ``instance`` with snapshot DCOPF set components."""
+def build_sets(instance: Any, case: Any, setlist: Iterable[Any]) -> Any:
+    """Populate ``instance`` with listed components."""
 
     set_blocks = Sets_Blocks(case).blocks
-    set_defs = [SimpleNamespace(name=n, **asdict(set_blocks[n])) for n in SetList]
+    set_defs = [SimpleNamespace(name=n, **asdict(set_blocks[n])) for n in setlist]
     add_sets_to_instance(instance, set_defs)
     return instance
 
-def build_params(instance: Any, case: Any, ParamList: Iterable[Any]) -> Any:
-    """Populate ``instance`` with snapshot DCOPF parameter components."""
+def build_params(instance: Any, case: Any, paramlist: Iterable[Any]) -> Any:
+    """Populate ``instance`` with listed parameter components."""
 
     param_blocks = Params_Blocks(case).blocks
-    param_defs = [SimpleNamespace(name=n, **asdict(param_blocks[n])) for n in ParamList]
+    param_defs = [SimpleNamespace(name=n, **asdict(param_blocks[n])) for n in paramlist]
     add_params_to_instance(instance, param_defs)
     return instance
 
-def build_variables(instance: Any, VarList: Iterable[Any]) -> Any:
-    """Populate ``instance`` with snapshot DCOPF variable components."""
+def build_variables(instance: Any, varlist: Iterable[Any]) -> Any:
+    """Populate ``instance`` with listed variable components."""
 
     var_blocks = Variables_Blocks(instance).blocks
-    var_defs = [SimpleNamespace(name=n, **asdict(var_blocks[n])) for n in VarList]
+    var_defs = [SimpleNamespace(name=n, **asdict(var_blocks[n])) for n in varlist]
     add_variables_to_instance(instance, var_defs)
     return instance
 
-def build_constraints(instance: Any, ConstraintList: Iterable[Any]) -> Any:
-    """Populate ``instance`` with snapshot DCOPF constraint components."""
+def build_constraints(instance: Any, constraintlist: Iterable[Any]) -> Any:
+    """Populate ``instance`` with listed constraint components."""
 
     constraint_blocks = Constraint_Blocks(instance).blocks
-    constraint_defs = [SimpleNamespace(name=n, **asdict(constraint_blocks[n])) for n in ConstraintList]
+    constraint_defs = [SimpleNamespace(name=n, **asdict(constraint_blocks[n])) for n in constraintlist]
     add_constraints_to_instance(instance, constraint_defs)
     return instance
 

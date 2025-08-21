@@ -1,9 +1,9 @@
-from pyomo_models.build.definitions import *
-from pyomo_models.build.build_functions import *
-from pyomo_models.build.names import *
+from build.definitions import *
+from build.build_functions import *
+from build.names import *
 import data_io.load_case as load_case
-import pyomo_models.build.pyosolve as pyosolve
-import pyomo_models.models.dcopf as dcopf_model
+import build.pyosolve as pyosolve
+import models.dcopf as dcopf_model
 
 #Load Case
 
@@ -12,14 +12,15 @@ def run_model(testcase = "end-to-end-testcase.xlsx", solver = "appsi_highs", mod
 
     #load case
     case = load_case.Case()
-    case._load_excel_snapshot_case("end-to-end-testcase.xlsx")
+    case._load_excel_case("end-to-end-testcase.xlsx")
     case.summary()
 
     #run model
     match model:
         case 'DCOPF':
-            build_sets()
-            dcopf_model.SNAPSHOT_DCOPF_INDIVIDUAL_CONSTRAINTS
+
+            result = dcopf_model.dcopf_snaphot(case)
+            ...
 
     
 
