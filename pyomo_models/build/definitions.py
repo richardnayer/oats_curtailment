@@ -690,15 +690,3 @@ class Constraint_Blocks:
                 rule=lambda instance, bus: instance.delta[bus] == 0,
             ),
         }
-
-class Objective_Blocks:
-    def __init__(self, instance: Any):
-        self.blocks: Dict[ComponentName, ObjectiveDef] = {
-            # --- POWER LINE CONSTRAINTS ---
-            ComponentName.marginal_cost: ConstraintDef(
-                rule= lambda: sum((instance.c1[g]+np.random.default_rng(100).random())*instance.pG[g]+(instance.c0[g]/instance.baseMVA) for g in instance.G) +\
-                              sum(instance.VOLL[d]*(1-instance.alpha[d])*instance.PD[d] for d in instance.D)+ \
-                              sum(instance.bid[g] * (instance.PGmax[g]-instance.pG[g]) for g in instance.G),
-                sense = minimize
-            )
-        }

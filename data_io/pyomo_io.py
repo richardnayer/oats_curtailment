@@ -1,6 +1,5 @@
 from pyomo.environ import *
 import pandas as pd
-from tabulate import tabulate
 
 class InstanceCache:
     def __init__(self, result, data_to_cache, options=None):
