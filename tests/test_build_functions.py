@@ -6,7 +6,7 @@ import pytest
 pytest.importorskip("pyomo")
 from pyomo.environ import ConcreteModel, NonNegativeReals
 
-from pyomo_models.build.functions import (
+from pyomo_models.build.build_functions import (
     add_constraints_to_instance,
     add_params_to_instance,
     add_sets_to_instance,

@@ -182,172 +182,35 @@ def remove_component_from_instance(instance: Any, component_list: Iterable[str])
                 f"Set '{name}' cannot be deleted as it does not exist in the instance"
             )
 
-def dcopf_marginal_cost_objective(instance):
-    '''
-    Objective function for marginal costs: \n
-     - Linear Generator Costs (c0 + c1), peturbed by random value between [0,1) to break symmetry
-     - Value of Lost Load of Demands
-     - Bid Price of Wind against total
-     - TAKE CARE: Power variables are still in p.u, scaled by baseMVA. Therefore
-        resulting obj will also be scaled by baseMVA. Variables not re-scaled here
-        in cost function to avoid numerical trouble in solver
-    '''
-    rnd = np.random.default_rng(100)
-
-    obj = sum((instance.c1[g]+rnd.random())*instance.pG[g]+(instance.c0[g]/instance.baseMVA) for g in instance.G) +\
-          sum(instance.VOLL[d]*(1-instance.alpha[d])*instance.PD[d] for d in instance.D)+ \
-          sum(instance.bid[g] * (instance.PGmax[g]-instance.pG[g]) for g in instance.G)
-    return obj
-
-
-# --- Snapshot DCOPF component groups -------------------------------------
-
-SNAPSHOT_DCOPF_SETS = [
-    ComponentName.B,
-    ComponentName.b0,
-    ComponentName.G,
-    ComponentName.generator_mapping,
-    ComponentName.G_LIFO,
-    ComponentName.G_LIFO_pairs,
-    ComponentName.G_prorata,
-    ComponentName.G_prorata_map,
-    ComponentName.G_prorata_pairs,
-    ComponentName.G_individual,
-    ComponentName.G_uncontrollable,
-    ComponentName.prorata_groups,
-    ComponentName.L,
-    ComponentName.bus_line_in,
-    ComponentName.bus_line_out,
-    ComponentName.line_busses,
-    ComponentName.TRANSF,
-    ComponentName.bus_transformer_in,
-    ComponentName.bus_transformer_out,
-    ComponentName.transformer_busses,
-    ComponentName.D,
-    ComponentName.DNeg,
-    ComponentName.demand_bus_mapping,
-]
-
-SNAPSHOT_DCOPF_PARAMS = [
-    ComponentName.line_max_continuous_P,
-    ComponentName.line_susceptance,
-    ComponentName.line_reactance,
-    ComponentName.transformer_max_continuous_P,
-    ComponentName.transformer_susceptance,
-    ComponentName.transformer_reactance,
-    ComponentName.PD,
-    ComponentName.VOLL,
-    ComponentName.PGmax,
-    ComponentName.PGmin,
-    ComponentName.c0,
-    ComponentName.c1,
-    ComponentName.bid,
-    ComponentName.baseMVA,
-]
-
-SNAPSHOT_DCOPF_VARIABLES = [
-    ComponentName.pG,
-    ComponentName.pD,
-    ComponentName.alpha,
-    ComponentName.zeta_cg,
-    ComponentName.zeta_wind,
-    ComponentName.zeta_bin,
-    ComponentName.minimum_zeta,
-    ComponentName.gamma,
-    ComponentName.beta,
-    ComponentName.deltaL,
-    ComponentName.deltaLT,
-    ComponentName.delta,
-    ComponentName.pL,
-    ComponentName.pLT,
-]
-
-SNAPSHOT_DCOPF_NETWORK_CONSTRAINTS = [
-    ComponentName.KCL_networked_realpower_noshunt,
-    ComponentName.KVL_DCOPF_lines,
-    ComponentName.KVL_DCOPF_transformer,
-    ComponentName.demand_real_alpha_controlled,
-    ComponentName.demand_alpha_max,
-    ComponentName.demand_alpha_fixneg,
-    ComponentName.line_cont_realpower_max_pstve,
-    ComponentName.line_cont_realpower_max_ngtve,
-    ComponentName.volts_line_delta,
-    ComponentName.transf_continuous_real_max_pstve,
-    ComponentName.transf_continuous_real_max_ngtve,
-    ComponentName.volts_transformer_delta,
-    ComponentName.volts_reference_bus,
-]
-
-SNAPSHOT_DCOPF_LIFO_CONSTRAINTS = [
-    ComponentName.gen_LIFO_realpower_max,
-    ComponentName.gen_LIFO_realpower_min,
-    ComponentName.gen_LIFO_gamma,
-    ComponentName.gen_LIFO_beta,
-]
-
-SNAPSHOT_DCOPF_PRORATA_CONSTRAINTS = [
-    ComponentName.gen_prorata_realpower_max,
-    ComponentName.gen_prorata_realpower_min,
-    ComponentName.gen_prorata_realpower_min_zeta,
-    ComponentName.gen_prorata_zeta_max,
-    ComponentName.gen_prorata_zeta_min,
-    ComponentName.gen_prorata_zeta_binary,
-]
-
-SNAPSHOT_DCOPF_INDIVIDUAL_CONSTRAINTS = [
-    ComponentName.gen_individual_realpower_max,
-    ComponentName.gen_individual_realpower_min,
-]
-
-SNAPSHOT_DCOPF_UNCONTROLLABLE_CONSTRAINTS = [
-    ComponentName.gen_uncontrollable_realpower_sp,
-]
-
-
-def build_snapshot_dcopf_sets(instance: Any, case: Any) -> Any:
+def build_sets(instance: Any, case: Any, SetList: Iterable[Any]) -> Any:
     """Populate ``instance`` with snapshot DCOPF set components."""
 
     set_blocks = Sets_Blocks(case).blocks
-    set_defs = [SimpleNamespace(name=n, **asdict(set_blocks[n])) for n in SNAPSHOT_DCOPF_SETS]
+    set_defs = [SimpleNamespace(name=n, **asdict(set_blocks[n])) for n in SetList]
     add_sets_to_instance(instance, set_defs)
     return instance
 
-
-def build_snapshot_dcopf_params(instance: Any, case: Any) -> Any:
+def build_params(instance: Any, case: Any, ParamList: Iterable[Any]) -> Any:
     """Populate ``instance`` with snapshot DCOPF parameter components."""
 
     param_blocks = Params_Blocks(case).blocks
-    param_defs = [SimpleNamespace(name=n, **asdict(param_blocks[n])) for n in SNAPSHOT_DCOPF_PARAMS]
+    param_defs = [SimpleNamespace(name=n, **asdict(param_blocks[n])) for n in ParamList]
     add_params_to_instance(instance, param_defs)
     return instance
 
-
-def build_snapshot_dcopf_variables(instance: Any) -> Any:
+def build_variables(instance: Any, VarList: Iterable[Any]) -> Any:
     """Populate ``instance`` with snapshot DCOPF variable components."""
 
     var_blocks = Variables_Blocks(instance).blocks
-    var_defs = [SimpleNamespace(name=n, **asdict(var_blocks[n])) for n in SNAPSHOT_DCOPF_VARIABLES]
+    var_defs = [SimpleNamespace(name=n, **asdict(var_blocks[n])) for n in VarList]
     add_variables_to_instance(instance, var_defs)
     return instance
 
-
-def build_snapshot_dcopf_constraints(instance: Any) -> Any:
+def build_constraints(instance: Any, ConstraintList: Iterable[Any]) -> Any:
     """Populate ``instance`` with snapshot DCOPF constraint components."""
 
-    constraints_list = list(SNAPSHOT_DCOPF_NETWORK_CONSTRAINTS)
-    if [g for g in instance.G_LIFO] != []:
-        constraints_list += SNAPSHOT_DCOPF_LIFO_CONSTRAINTS
-    if [g for g in instance.G_prorata] != []:
-        constraints_list += SNAPSHOT_DCOPF_PRORATA_CONSTRAINTS
-    if [g for g in instance.G_individual] != []:
-        constraints_list += SNAPSHOT_DCOPF_INDIVIDUAL_CONSTRAINTS
-    if [g for g in instance.G_uncontrollable] != []:
-        constraints_list += SNAPSHOT_DCOPF_UNCONTROLLABLE_CONSTRAINTS
-
     constraint_blocks = Constraint_Blocks(instance).blocks
-    constraint_defs = [
-        SimpleNamespace(name=n, **asdict(constraint_blocks[n])) for n in constraints_list
-    ]
+    constraint_defs = [SimpleNamespace(name=n, **asdict(constraint_blocks[n])) for n in ConstraintList]
     add_constraints_to_instance(instance, constraint_defs)
     return instance
 
