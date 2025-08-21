@@ -149,7 +149,7 @@ def dcopf_snaphot(case: object):
                 "Param" : [],
                 "Set" : []}
     
-    output = pyomo_io.InstanceCache(instance, result, data_to_cache)
+    output = pyomo_io.InstanceCache(result, data_to_cache)
     output.set(instance)
     output.var(instance)
     output.param(instance)

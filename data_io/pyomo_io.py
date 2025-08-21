@@ -3,19 +3,18 @@ import pandas as pd
 from tabulate import tabulate
 
 class InstanceCache:
-    def __init__(self, instance, result, data_to_cache, options=None):
+    def __init__(self, result, data_to_cache, options=None):
         self.result = result
         self.data_to_cache = data_to_cache
         self.headers = None
         self.options = options
         self.obj = 0
 
-    # add objective
+    #Add objective to object
     def obj_value(self, instance):
         # setattr(self, "obj",  )
         obj_val = value(getattr(instance, "OBJ"))
         setattr(self, "obj", obj_val)
-
 
     #Add Parameters to Object
     def param(self, instance):
@@ -43,8 +42,7 @@ class InstanceCache:
             setattr(self, str(p), {index: paramobject[index].value if "pyomo" in str(type(paramobject[index])) else paramobject[index]
                                     for index in paramobject})
     
-        
-     #Add Variables to Object
+    #Add Variables to Object
     def var(self, instance):
         '''
         Function iterates through variables in the model, and adds data indexed in a dictionary for each variable.
@@ -65,9 +63,7 @@ class InstanceCache:
             # Use a generator to assign index-value pairs directly to the attribute
             setattr(self, str(v), {index: varobject[index].value if "pyomo" in str(type(varobject[index])) else varobject[index]
                                    for index in varobject})
-            
-        
-            
+               
     #Add Sets to Object
     def set(self, instance):
         '''
@@ -86,8 +82,6 @@ class InstanceCache:
             setobject = getattr(instance, str(s))
             setattr(self, str(s), setobject.data())
             
-            
-    def output(self, instance, table_list=None):
         results = {}
         for v in instance.component_data_objects(Var, active=True):
             try:
