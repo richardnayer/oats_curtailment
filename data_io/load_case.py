@@ -67,7 +67,7 @@ class Case(UserDict):
         self._load_snapshot(excel_file)
 
         if timeseries:
-            self._load_timeseries(excel_file)
+            self._load_iterations(excel_file)
 
     def _sheet_parser(self, excel_file: pd.ExcelFile, sheet_config: Dict[str, Dict[str, str]]) -> None:
         #Parse all sheets into individual dataframes, according to config settings, add to 'self' object.
@@ -87,6 +87,9 @@ class Case(UserDict):
 
             if config.get('col_types') != None:
                 df = self._apply_column_types(df, config['col_types'])
+
+            if config.get('index') != None:
+                df = df.set_index(config.get('index'))
 
             self[config['key']] = df
             logger.info(f"Loaded {len(df)} rows into '{config['key']}'")
@@ -188,7 +191,7 @@ class Case(UserDict):
         #Convert baseMVA into a single value
         self._set_baseMVA()
 
-    def _load_timeseries(self, excel_file: pd.ExcelFile) -> None:
+    def _load_iterations(self, excel_file: pd.ExcelFile) -> None:
         """
         Placeholder for timeseries data handling.
         Currently not implemented.
@@ -197,6 +200,12 @@ class Case(UserDict):
         sheet_config: Dict[str, Dict[str, Any]] = {
             'ts_PD': {
                 'key': 'ts_PD',
+                'index': 'timestep',
+                'dropna': True,
+                'filter_active': True
+            },
+            'ts_VOLL': {
+                'key': 'ts_VOLL',
                 'index': 'timestep',
                 'dropna': True,
                 'filter_active': True
@@ -241,6 +250,9 @@ class Case(UserDict):
 
         #Parse all sheets into dataframe and add to self
         self._sheet_parser(excel_file, sheet_config)
+
+        #Take timseries data from index and define as timesteps
+        self.iterations = self.ts_PD.index
 
     def _set_baseMVA(self) -> float:
         if len(self.baseMVA['baseMVA']) > 1:

@@ -65,6 +65,7 @@ class Sets_Blocks:
                     case, "generators", "name"
                 ),
             ),
+
             # -> Set mapping all generators to a bus, results in a dictionary of bus with a list of attached generators
             ComponentName.generator_mapping: SetDef(
                 index=ComponentName.B,
@@ -77,6 +78,7 @@ class Sets_Blocks:
                     "busname",
                 ),
             ),
+
             # -> Set of all generators with an export policy of LIFO
             ComponentName.G_LIFO: SetDef(
                 within=ComponentName.G,
@@ -235,6 +237,20 @@ class Sets_Blocks:
                 ),
                 ordered=True,
             ),
+            
+            ComponentName.L_nonzero: SetDef(
+                index = None,
+                within = ComponentName.L,
+                initialize = lambda: helpers.get_param_list(
+                    case,
+                    "branches",
+                    "name",
+                    "ContinousRating",
+                    "!=",
+                    "0"
+                ),
+                ordered = False
+            ),
 
             # --- SETS FOR TRANSFORMERS ---
             ComponentName.TRANSF: SetDef(
@@ -273,6 +289,19 @@ class Sets_Blocks:
                     ["from_busname", "to_busname"],
                 ),
                 ordered=True,
+            ),
+            ComponentName.TRANSF_nonzero: SetDef(
+                index = None,
+                within = ComponentName.TRANSF,
+                initialize = lambda: helpers.get_param_list(
+                    case,
+                    "transformers",
+                    "name",
+                    "ContinousRating",
+                    "!=",
+                    "0"
+                ),
+                ordered = False
             ),
 
             # --- SETS FOR DEMANDS ---
@@ -465,7 +494,7 @@ class Variables_Blocks:
                 index=ComponentName.G_prorata_pairs,
                 domain=Binary,
             ),
-            ComponentName.minimum_zeta: VarDef(
+            ComponentName.prorata_minimum_zeta: VarDef(
                 index=ComponentName.G_prorata_pairs,
                 domain=NonNegativeReals,
                 bounds=(0, 1),
@@ -480,6 +509,12 @@ class Variables_Blocks:
                 index=ComponentName.G_LIFO,
                 domain=NonNegativeReals,
                 bounds=(0, 1),
+            ),
+
+            #MINGEN Zeta Control Variable
+            ComponentName.MINGEN_zeta: VarDef(
+                domain = NonNegativeReals,
+                bounds = (0,1),
             ),
 
             #STATE VARIABLES
@@ -537,7 +572,7 @@ class Constraint_Blocks:
             ),
 
             #--- GENERATION CONSTRAINTS ---
-            # --- Uncontrollable EER Policy ---
+            # --- Uncontrollable EER Policy (As Defined by Generator Type)---
             ComponentName.gen_uncontrollable_realpower_sp: ConstraintDef(
                 index=ComponentName.G_uncontrollable,
                 rule=lambda instance, generator: instance.pG[generator]
@@ -551,7 +586,14 @@ class Constraint_Blocks:
                 >= instance.PGMINGEN[generator],
             ),
 
-            # --- Individual EER Policy ---
+            ComponentName.gen_post_mingen_redispatch_UB: ConstraintDef(
+            #Redispatches non-synchronous generators 
+                index=ComponentName.G_ns,
+                rule=lambda instance, generator: instance.pG[generator] == instance.PGmax[generator] * instance.MINGEN_zeta
+            ),
+            
+
+            # --- Individual EER Policy (As Defined By Generator Type) ---
             ComponentName.gen_individual_realpower_max: ConstraintDef(
                 index=ComponentName.G_individual,
                 rule=lambda instance, generator: instance.pG[generator]
@@ -563,7 +605,31 @@ class Constraint_Blocks:
                 >= instance.PGmin[generator],
             ),
 
-            # --- Pro-Rata ERG Curtailment ---
+            # --- Individual EER Policy (Forced on All Generators) ---
+            ComponentName.gen_forced_individual_realpower_max: ConstraintDef(
+                index=ComponentName.G,
+                rule=lambda instance, generator: instance.pG[generator]
+                <= instance.PGmax[generator],
+            ),
+            ComponentName.gen_forced_individual_realpower_min: ConstraintDef(
+                index=ComponentName.G,
+                rule=lambda instance, generator: instance.pG[generator]
+                >= instance.PGmin[generator],
+            ),
+
+            # --- Individual EER Policy (Synchronous Only) ---
+            ComponentName.gen_synchronous_individual_realpower_max: ConstraintDef(
+                index=ComponentName.G_s,
+                rule=lambda instance, generator: instance.pG[generator]
+                <= instance.PGmax[generator],
+            ),
+            ComponentName.gen_synchronous_individual_realpower_min: ConstraintDef(
+                index=ComponentName.G_s,
+                rule=lambda instance, generator: instance.pG[generator]
+                >= instance.PGmin[generator],
+            ),
+
+            # --- Pro-Rata ERG Curtailment (As Defined by Generator Type) ---
             ComponentName.gen_prorata_realpower_max: ConstraintDef(
                 index=ComponentName.G_prorata,
                 rule=lambda instance, generator: instance.pG[generator]
@@ -574,21 +640,34 @@ class Constraint_Blocks:
                 rule=lambda instance, generator: instance.pG[generator]
                 >= instance.PGmin[generator],
             ),
+            #Constrains output of each generator to greater than or equal to the minimum defined value, multiplied by the 'zeta' operator, where zeta is a number between 0 -> 1.  \n
+            #Should be defined against the set of pro-rata generators (model.G_prorata)
             ComponentName.gen_prorata_realpower_min_zeta: ConstraintDef(
                 index=ComponentName.G_prorata,
                 rule=lambda instance, generator: instance.pG[generator]
                 >= instance.PGmax[generator] * instance.zeta_wind[generator],
             ),
+            #Constraint that ensures the 'zeta' operator for each generator, is less than or equal to the
+            #'zeta' operator of all the constraint groups (cg) to which the generator belongs. \n
+            #defined against the set of pairs of wind generators and their constraint groups.
             ComponentName.gen_prorata_zeta_max: ConstraintDef(
                 index=ComponentName.G_prorata_pairs,
                 rule=lambda instance, generator, cg: instance.zeta_wind[generator]
                 <= instance.zeta_cg[cg],
             ),
+            #Constraint that ensures that the 'zeta' operator for each generator is greater than
+            #at least one of the other 'zeta' operators within the constraint group. Note the inclusion
+            #of the zeta_bin variable, which is a binary value.
+            #defined against the set of pairs of wind generators and their constraint groups.
+            #See link for more info on formulation: https://www.fico.com/fico-xpress-optimization/docs/dms2019-04/mipform/dhtml/chap2s1_sec_ssecminval.html
             ComponentName.gen_prorata_zeta_min: ConstraintDef(
                 index=ComponentName.G_prorata_pairs,
                 rule=lambda instance, generator, cg: instance.zeta_wind[generator]
                 >= instance.zeta_cg[cg] - (1 - 0) * (1 - instance.zeta_bin[(generator, cg)]),
             ),
+            #Constraint that ensures that the sum of all of the binary 'zeta_bin' 
+            #Should be defined against the set of wind generators
+            #See link for more info on formulation: https://www.fico.com/fico-xpress-optimization/docs/dms2019-04/mipform/dhtml/chap2s1_sec_ssecminval.html
             ComponentName.gen_prorata_zeta_binary: ConstraintDef(
                 index=ComponentName.G_prorata,
                 rule=lambda instance, generator: sum(
@@ -621,6 +700,14 @@ class Constraint_Blocks:
             ),
 
             # --- KCL CONSTRAINTS ---
+            #Copperplate network (i.e. no network constraints)
+            ComponentName.KCL_copperplate: ConstraintDef(
+                index = None,
+                rule = lambda instance: + sum(instance.pG[generator] for generator in instance.G)
+                                        ==
+                                        sum(instance.pD[demand] for demand in instance.D)
+            ),
+            # Network without Shunts
             ComponentName.KCL_networked_realpower_noshunt: ConstraintDef(
                 index=ComponentName.B,
                 rule=lambda instance, bus: + sum(
@@ -644,13 +731,17 @@ class Constraint_Blocks:
             ),
 
             # --- KVL CONSTRAINTS---
+            # Power Lines (Branches)
+            #defined only against lines with a non-zero rating
             ComponentName.KVL_DCOPF_lines: ConstraintDef(
-                index=ComponentName.L,
+                index=ComponentName.L_nonzero,
                 rule=lambda instance, line: instance.pL[line]
                 == (1 / instance.line_reactance[line]) * instance.deltaL[line],
             ),
+            # Transformers
+            #defined only against lines with a non-zero rating
             ComponentName.KVL_DCOPF_transformer: ConstraintDef(
-                index=ComponentName.TRANSF,
+                index=ComponentName.TRANSF_nonzero,
                 rule=lambda instance, transformer: instance.pLT[transformer]
                 == (1 / instance.transformer_reactance[transformer])
                 * instance.deltaLT[transformer],

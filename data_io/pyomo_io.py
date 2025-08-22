@@ -81,8 +81,9 @@ class InstanceCache:
             setobject = getattr(instance, str(s))
             setattr(self, str(s), setobject.data())
             
+    def output(self, table_list=None):
         results = {}
-        for v in instance.component_data_objects(Var, active=True):
+        for v in self.instance.component_data_objects(Var, active=True):
             try:
                 if v.value is not None:
                     split_key = str(v).split("[")

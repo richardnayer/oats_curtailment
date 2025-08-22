@@ -1,4 +1,3 @@
-
 from pyomo_models.build.definitions import *
 from pyomo_models.build.build_functions import *
 from pyomo_models.build.names import *
@@ -7,11 +6,15 @@ import pyomo_models.build.pyosolve as pyosolve
 from pyomo_models.build.obj_functions import dcopf_marginal_cost_objective
 
 
-def dcopf_snaphot(case: object):
+def model(case: object, solver):
     #Create Model & Instance
     model = AbstractModel()
     instance = model.create_instance()
-    
+
+    #Define Data Outputs
+    output = {}
+    result = {}
+
     #Define list of sets for model and add to model
     setlist = [
         ComponentName.B,
@@ -27,10 +30,12 @@ def dcopf_snaphot(case: object):
         ComponentName.G_uncontrollable,
         ComponentName.prorata_groups,
         ComponentName.L,
+        ComponentName.L_nonzero,
         ComponentName.bus_line_in,
         ComponentName.bus_line_out,
         ComponentName.line_busses,
         ComponentName.TRANSF,
+        ComponentName.TRANSF_nonzero,
         ComponentName.bus_transformer_in,
         ComponentName.bus_transformer_out,
         ComponentName.transformer_busses,
@@ -67,7 +72,7 @@ def dcopf_snaphot(case: object):
         ComponentName.zeta_cg,
         ComponentName.zeta_wind,
         ComponentName.zeta_bin,
-        ComponentName.minimum_zeta,
+        ComponentName.prorata_minimum_zeta,
         ComponentName.gamma,
         ComponentName.beta,
         ComponentName.deltaL,
@@ -141,18 +146,31 @@ def dcopf_snaphot(case: object):
     #Define Objective Function
     instance.OBJ = Objective(rule = dcopf_marginal_cost_objective(instance), sense=minimize)
 
-    #Solve Instance
-    result = pyosolve.solveinstance(instance, solver="appsi_highs")
+    #Define time dependent parameters
+    ts_params = ['PD',
+                'VOLL',
+                'line_max_continuous_P',
+                'transformer_max_continuous_P',
+                'PGmin',
+                'PGmax',
+                'bid'] 
 
-    #Define Data to Save
-    data_to_cache = {"Var": [], 
-                "Param" : [],
-                "Set" : []}
+    for iteration in case.iterations:
+        #Update parameters for current timestep
+        add_iteration_params_to_instance(instance, case, ts_params, iteration)
+
+        result[iteration] = pyosolve.solveinstance(instance, solver = solver)
+
+        #Define Data to Save
+        data_to_cache = {"Var": [], 
+                    "Param" : [],
+                    "Set" : []}
+        
+        #Cache Data
+        output[iteration] = pyomo_io.InstanceCache(result, data_to_cache)
+        output[iteration].set(instance)
+        output[iteration].var(instance)
+        output[iteration].param(instance)
+        output[iteration].obj_value(instance)
     
-    output = pyomo_io.InstanceCache(result, data_to_cache)
-    output.set(instance)
-    output.var(instance)
-    output.param(instance)
-    output.obj_value(instance)
-
     return output, result

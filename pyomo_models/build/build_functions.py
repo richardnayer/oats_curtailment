@@ -133,6 +133,28 @@ def add_params_to_instance(instance: Any, param_defs: Iterable[Any]) -> None:
             logger.info(f"Deleted and redefined parameter component {name_str}")
         instance.add_component(name_str, component)
 
+def add_iteration_params_to_instance(instance: Any, case: Any, param_list: list[Any], iteration: int) -> None:
+    '''
+    Function to update paramaters within an instance for a certain iteration, when an iterative model is being used.
+    '''
+    param_functions = {
+        ComponentName.PD: lambda iteration, demand: getattr(case, "ts_PD").loc[iteration, demand] / case.baseMVA,
+        ComponentName.VOLL: lambda iteration, demand: getattr(case, "ts_VOLL").loc[iteration, demand],
+        ComponentName.line_max_continuous_P: lambda iteration, line: getattr(case, "ts_Lmax").loc[iteration, line] / case.baseMVA,
+        ComponentName.transformer_max_continuous_P: lambda iteration, transformer: getattr(case, "ts_TLmax").loc[iteration, transformer] / case.baseMVA,
+        ComponentName.PGMINGEN: lambda iteration, generator: getattr(case,"ts_PGMINGEN").loc[iteration, generator] / case.baseMVA,
+        ComponentName.PGmin: lambda iteration, generator: getattr(case, "ts_PGLB").loc[iteration, generator] / case.baseMVA,
+        ComponentName.PGmax: lambda iteration, generator: getattr(case, "ts_PGUB").loc[iteration, generator] / case.baseMVA,
+        ComponentName.bid: lambda iteration, generator: getattr(case, "ts_bid").loc[iteration, generator],
+    }
+
+    for param in param_list:
+        if param in param_functions.keys():
+            for item in getattr(instance, param):
+                getattr(instance, param)[item] = param_functions[param](iteration, item)
+        else:
+            raise KeyError(f"{param} is not defined as a timeseries function. Please ensure it is defined in the add_ts_params_to_instance() functions internal dict")
+
 def add_variables_to_instance(instance: Any, variable_defs: Iterable[Any]) -> None:
     """Add variables defined by dataclass objects to a model instance."""
 
