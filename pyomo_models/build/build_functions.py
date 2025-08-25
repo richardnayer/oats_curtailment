@@ -26,6 +26,7 @@ from .definitions import (
     Variables_Blocks,
     Constraint_Blocks,
 )
+from data_io import helpers
 
 # Set up logger
 logger = logging.getLogger(__name__)
@@ -113,6 +114,40 @@ def add_sets_to_instance(instance: Any, set_defs: Iterable[Any]) -> None:
             logger.info(f"Deleted and redefined set component {name_str}")
         instance.add_component(name_str, component)
 
+def add_iteration_sets_to_instance(instance: Any, case: Any, set_list: list[Any], iteration: int) -> None:
+    set_functions = {
+        ComponentName.L_nonzero: {"dimen": 1,
+                                  "index": None,
+                                  "within": ComponentName.L,
+                                  "initialize": lambda: helpers.get_ts_param_index_list(case, "ts_Lmax", iteration, ">", 0)
+                                  },
+
+        ComponentName.TRANSF_nonzero: {"dimen": 1,
+                                       "index": None,
+                                       "within": ComponentName.TRANSF,
+                                       "initialize":lambda: helpers.get_ts_param_index_list(case, "ts_TLmax", iteration, ">", 0)
+                                       }
+    }
+
+    for sett in set_list:
+        if sett in set_functions.keys():
+            name = _name_to_str(sett)
+            dimen = set_functions.get(sett).get("dimen", 1)
+            index = _index_resolver(instance, set_functions.get(sett).get("index", None))
+            within = _within_resolver(instance, set_functions.get(sett).get("within", None))
+            initialize = _initialize_resolver(set_functions.get(sett).get("initialize", None))
+
+            if index is not None:
+                component = Set(index, within=within, initialize=initialize, dimen=dimen)
+            else:
+                component = Set(within=within, initialize=initialize, dimen=dimen)
+
+            if hasattr(instance, name):
+                instance.del_component(getattr(instance, name))
+                logger.info(f"Deleted and redefined set component {name}")
+            instance.add_component(name, component)
+
+
 def add_params_to_instance(instance: Any, param_defs: Iterable[Any]) -> None:
     """Add parameters defined by dataclass objects to a model instance."""
 
@@ -138,20 +173,20 @@ def add_iteration_params_to_instance(instance: Any, case: Any, param_list: list[
     Function to update paramaters within an instance for a certain iteration, when an iterative model is being used.
     '''
     param_functions = {
-        ComponentName.PD: lambda iteration, demand: getattr(case, "ts_PD").loc[iteration, demand] / case.baseMVA,
-        ComponentName.VOLL: lambda iteration, demand: getattr(case, "ts_VOLL").loc[iteration, demand],
-        ComponentName.line_max_continuous_P: lambda iteration, line: getattr(case, "ts_Lmax").loc[iteration, line] / case.baseMVA,
-        ComponentName.transformer_max_continuous_P: lambda iteration, transformer: getattr(case, "ts_TLmax").loc[iteration, transformer] / case.baseMVA,
-        ComponentName.PGMINGEN: lambda iteration, generator: getattr(case,"ts_PGMINGEN").loc[iteration, generator] / case.baseMVA,
-        ComponentName.PGmin: lambda iteration, generator: getattr(case, "ts_PGLB").loc[iteration, generator] / case.baseMVA,
-        ComponentName.PGmax: lambda iteration, generator: getattr(case, "ts_PGUB").loc[iteration, generator] / case.baseMVA,
-        ComponentName.bid: lambda iteration, generator: getattr(case, "ts_bid").loc[iteration, generator],
+        ComponentName.PD: lambda: helpers.get_ts_param_dict(case, "ts_PD", iteration, baseMVA = case.baseMVA),
+        ComponentName.VOLL: lambda: helpers.get_ts_param_dict(case, "ts_VOLL", iteration),
+        ComponentName.line_max_continuous_P: lambda: helpers.get_ts_param_dict(case, "ts_Lmax", iteration, baseMVA = case.baseMVA),
+        ComponentName.transformer_max_continuous_P: lambda: helpers.get_ts_param_dict(case, "ts_TLmax", iteration, baseMVA = case.baseMVA),
+        ComponentName.PGMINGEN: lambda: helpers.get_ts_param_dict(case, "ts_PGMINGEN", iteration, baseMVA = case.baseMVA),
+        ComponentName.PGmin: lambda: helpers.get_ts_param_dict(case, "ts_PGLB", iteration, baseMVA = case.baseMVA),
+        ComponentName.PGmax: lambda: helpers.get_ts_param_dict(case, "ts_PGUB", iteration, baseMVA = case.baseMVA),
+        ComponentName.bid: lambda: helpers.get_ts_param_dict(case, "ts_bid", iteration),
     }
+
 
     for param in param_list:
         if param in param_functions.keys():
-            for item in getattr(instance, param):
-                getattr(instance, param)[item] = param_functions[param](iteration, item)
+            getattr(instance, param).store_values(param_functions[param]())
         else:
             raise KeyError(f"{param} is not defined as a timeseries function. Please ensure it is defined in the add_ts_params_to_instance() functions internal dict")
 
@@ -193,12 +228,14 @@ def add_constraints_to_instance(instance: Any, constraint_defs: Iterable[Any]) -
             logger.info(f"Deleted and redefined constraint component {name_str}")
         instance.add_component(name_str, component)
 
-def remove_component_from_instance(instance: Any, component_list: Iterable[str]) -> None:
+def remove_component_from_instance(instance: Any, component_list: Iterable[str], skip_missing = False) -> None:
     """Remove components from a model instance."""
 
     for name in component_list:
         if hasattr(instance, name):
             instance.del_component(getattr(instance, name))
+        elif skip_missing == True:
+            continue
         else:
             raise KeyError(
                 f"Set '{name}' cannot be deleted as it does not exist in the instance"

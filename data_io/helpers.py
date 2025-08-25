@@ -289,3 +289,91 @@ def get_paired_params_list(case, component, param_1, param_2, param_2_comma = Fa
     
     #Flatten List
     return [(param_1, param_2_item) for param_1, param_2 in dictionary.items() for param_2_item in param_2]
+
+def get_ts_param_index_list(case, ts_param, timestep, filter_operation = None, filter_value = None) -> list:
+    #Check if component exists
+    if not hasattr(case, ts_param):
+        raise AttributeError(f"Case object has no ts_component '{ts_param}'")
+    
+    #~~~~~~# Defining Filter Operations and Error Checking #~~~~~#
+    #Define supported operations
+    supported_operations = [None, '=', '!=', '>=', '>', '<=', '<']
+
+    #Check that all filters are set if one is set.
+    if any(param is None for param in [filter_operation, filter_value]) and not all(param is None for param in [filter_operation, filter_value]):
+        raise ValueError("If any of filter_operation or filter_value is set, all must be provided.")
+
+    #Check selected operator is a supported operation
+    if filter_operation not in supported_operations:
+        raise ValueError(f"The operator {filter_operation} is not defined for this function. Please use one of {supported_operations}")
+
+    #Get Dataframe    
+    df = getattr(case, ts_param)
+
+    #If no filter_operation then just return the headline index
+    if filter_operation is None:
+        return list(df.columns)
+    #Else get a filtered list of the index
+    else:
+        if filter_operation == '=':
+            return list(df.stack().loc[timestep].loc[lambda x: x == filter_value].index)
+        elif filter_operation == '!=':
+            return list(df.stack().loc[timestep].loc[lambda x: x != filter_value].index)
+        elif filter_operation == '>=':
+            return list(df.stack().loc[timestep].loc[lambda x: x >= filter_value].index)
+        elif filter_operation == '>':
+            return list(df.stack().loc[timestep].loc[lambda x: x > filter_value].index)
+        elif filter_operation == '<=':
+            return list(df.stack().loc[timestep].loc[lambda x: x <= filter_value].index)
+        elif filter_operation == '<':
+            return list(df.stack().loc[timestep].loc[lambda x: x < filter_value].index)
+        else:
+            raise ValueError(f"Unsupported operation '{filter_operation}'")   
+
+def get_ts_param_dict(case, ts_param, timestep, filter_operation = None, filter_value = None, baseMVA = None) -> list:
+    #Check if component exists
+    if not hasattr(case, ts_param):
+        raise AttributeError(f"Case object has no ts_component '{ts_param}'")
+    
+    #~~~~~~# Defining Filter Operations and Error Checking #~~~~~#
+    #Define supported operations
+    supported_operations = [None, '=', '!=', '>=', '>', '<=', '<']
+
+    #Check that all filters are set if one is set.
+    if any(param is None for param in [filter_operation, filter_value]) and not all(param is None for param in [filter_operation, filter_value]):
+        raise ValueError("If any of filter_operation or filter_value is set, all must be provided.")
+
+    #Check selected operator is a supported operation
+    if filter_operation not in supported_operations:
+        raise ValueError(f"The operator {filter_operation} is not defined for this function. Please use one of {supported_operations}")
+
+    #Get Dataframe    
+    df = getattr(case, ts_param)
+
+    #If no filter_operation then set dictionary as item at the timestep
+    if filter_operation is None:
+        df = df.stack().loc[timestep]
+    
+    #Else get a filtered dataframe of 
+    else:
+        if filter_operation == '=':
+            df = df.stack().loc[timestep].loc[lambda x: x == filter_value]
+        elif filter_operation == '!=':
+            df = df.stack().loc[timestep].loc[lambda x: x != filter_value]
+        elif filter_operation == '>=':
+            df = df.stack().loc[timestep].loc[lambda x: x >= filter_value]
+        elif filter_operation == '>':
+            df = df.stack().loc[timestep].loc[lambda x: x > filter_value]
+        elif filter_operation == '<=':
+            df = df.stack().loc[timestep].loc[lambda x: x <= filter_value]
+        elif filter_operation == '<':
+            df = df.stack().loc[timestep].loc[lambda x: x < filter_value]
+        else:
+            raise ValueError(f"Unsupported operation '{filter_operation}'")
+
+    if baseMVA == None:
+        return df.to_dict()
+
+    else:
+        return (df/baseMVA).to_dict()   
+

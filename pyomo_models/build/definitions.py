@@ -460,6 +460,12 @@ class Params_Blocks:
                 initialize=lambda: case.baseMVA,
                 mutable=False,
             ),
+            #SNSP Zeta Control Variable
+            ComponentName.SNSP_curtailment: ParamDef(
+                within = NonNegativeReals,
+                initialize = 0,
+                mutable = True,
+            ),
         }
 
 class Variables_Blocks:
@@ -580,13 +586,13 @@ class Constraint_Blocks:
             ),
 
             # --- Mingen Requirements ---
-            ComponentName.gen_mingen_LB: ConstraintDef(
+            ComponentName.gen_mingen_redispatch_LB: ConstraintDef(
                 index=ComponentName.G,
                 rule=lambda instance, generator: instance.pG[generator]
                 >= instance.PGMINGEN[generator],
             ),
 
-            ComponentName.gen_post_mingen_redispatch_UB: ConstraintDef(
+            ComponentName.gen_mingen_redispatch_UB: ConstraintDef(
             #Redispatches non-synchronous generators 
                 index=ComponentName.G_ns,
                 rule=lambda instance, generator: instance.pG[generator] == instance.PGmax[generator] * instance.MINGEN_zeta
