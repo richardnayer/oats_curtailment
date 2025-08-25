@@ -188,7 +188,7 @@ def add_iteration_params_to_instance(instance: Any, case: Any, param_list: list[
         if param in param_functions.keys():
             getattr(instance, param).store_values(param_functions[param]())
         else:
-            raise KeyError(f"{param} is not defined as a timeseries function. Please ensure it is defined in the add_ts_params_to_instance() functions internal dict")
+            raise KeyError(f"{param} is not defined as an iterative parameter. Please ensure it is defined in the add_iteration_params_to_instance() functions internal dict")
 
 def add_variables_to_instance(instance: Any, variable_defs: Iterable[Any]) -> None:
     """Add variables defined by dataclass objects to a model instance."""

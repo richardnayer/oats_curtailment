@@ -26,7 +26,7 @@ def run_model(testcase = "end-to-end-testcase.xlsx", solver = "appsi_highs", mod
         case 'DCOPF Timeseries':
             #load case
             case = load_case.Case()
-            case._load_excel_case("end-to-end-testcase.xlsx", timeseries = True)
+            case._load_excel_case("end-to-end-testcase.xlsx", iterative = True)
             case.summary()
             output, result = dcopf_iterations.model(case, solver)
             return output, result
@@ -34,7 +34,7 @@ def run_model(testcase = "end-to-end-testcase.xlsx", solver = "appsi_highs", mod
         case 'All Island Timeseries':
             #load case
             case = load_case.Case()
-            case._load_excel_case("end-to-end-testcase.xlsx", timeseries = True)
+            case._load_excel_case("end-to-end-testcase.xlsx", iterative = True)
             case.summary()
             output, result = all_island_iterations.model(case, solver)
             return output, result

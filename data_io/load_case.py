@@ -48,12 +48,12 @@ class Case(UserDict):
 
 
 
-    def _load_excel_case(self, filepath: str, timeseries: bool = False) -> None:
+    def _load_excel_case(self, filepath: str, iterative: bool = False) -> None:
         """
         Load system case data from an Excel file.
         Args:
             filepath (str): Path to the Excel file.
-            timeseries (bool): Whether to load timeseries data (not yet implemented).
+            iterative (bool): Whether to load iterative data (not yet implemented).
         """
         filepath = Path(filepath)
         if not filepath.exists():
@@ -66,7 +66,7 @@ class Case(UserDict):
 
         self._load_snapshot(excel_file)
 
-        if timeseries:
+        if iterative:
             self._load_iterations(excel_file)
 
     def _sheet_parser(self, excel_file: pd.ExcelFile, sheet_config: Dict[str, Dict[str, str]]) -> None:
@@ -192,10 +192,7 @@ class Case(UserDict):
         self._set_baseMVA()
 
     def _load_iterations(self, excel_file: pd.ExcelFile) -> None:
-        """
-        Placeholder for timeseries data handling.
-        Currently not implemented.
-        """
+        #TODO Add description
 
         sheet_config: Dict[str, Dict[str, Any]] = {
             'ts_PD': {

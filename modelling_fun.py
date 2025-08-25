@@ -11,7 +11,7 @@ import pyomo_models.build.pyosolve as pyosolve
 
 
 case = load_case.Case()
-case._load_excel_case("end-to-end-testcase.xlsx", timeseries = True)
+case._load_excel_case("end-to-end-testcase.xlsx", iterative = True)
 case.summary()
 
 model = AbstractModel()
