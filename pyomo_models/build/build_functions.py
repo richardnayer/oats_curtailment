@@ -180,7 +180,7 @@ def add_iteration_params_to_instance(instance: Any, case: Any, param_list: list[
         ComponentName.PGMINGEN: lambda: helpers.get_ts_param_dict(case, "ts_PGMINGEN", iteration, baseMVA = case.baseMVA),
         ComponentName.PGmin: lambda: helpers.get_ts_param_dict(case, "ts_PGLB", iteration, baseMVA = case.baseMVA),
         ComponentName.PGmax: lambda: helpers.get_ts_param_dict(case, "ts_PGUB", iteration, baseMVA = case.baseMVA),
-        ComponentName.bid: lambda: helpers.get_ts_param_dict(case, "ts_bid", iteration),
+        ComponentName.c_bid: lambda: helpers.get_ts_param_dict(case, "ts_bid", iteration),
     }
 
 

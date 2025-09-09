@@ -71,9 +71,9 @@ def model(case: object, solver):
         ComponentName.PGmax, #Defined each timestep
         ComponentName.PGmin, #Defined each timestep
         ComponentName.PGMINGEN,
-        ComponentName.c0, #Defined each timestep
-        ComponentName.c1,
-        ComponentName.bid, #Defined each timestep
+        ComponentName.c_0, #Defined each timestep
+        ComponentName.c_1,
+        ComponentName.c_bid, #Defined each timestep
         ComponentName.baseMVA,
         ComponentName.SNSP_curtailment
     ]
@@ -128,7 +128,7 @@ def model(case: object, solver):
                 ComponentName.PGmin,
                 ComponentName.PGmax,
                 ComponentName.PGMINGEN,
-                ComponentName.bid] 
+                ComponentName.c_bid] 
 
     #Define time dependent sets
     ts_sets = [ComponentName.L_nonzero,

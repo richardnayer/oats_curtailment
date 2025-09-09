@@ -8,7 +8,7 @@ sys.path.append(str(path_root))
 import data_io.load_case as load_case
 import pyomo_models.models.dcopf_snapshot as dcopf_snapshot
 import pyomo_models.models.dcopf_iterations as dcopf_iterations
-import pyomo_models.models.all_island_iterations as all_island_iterations
+import pyomo_models.models.all_island_iterations_v2 as all_island_iterations
 
 def run_model(testcase = "end-to-end-testcase.xlsx", solver = "appsi_highs", model="DCOPF"):
 

@@ -3,13 +3,16 @@ from pyomo_models.build.build_functions import *
 from pyomo_models.build.names import *
 import data_io.pyomo_io as pyomo_io
 import pyomo_models.build.pyosolve as pyosolve
-from pyomo_models.build.obj_functions import dcopf_marginal_cost_objective
+from pyomo_models.build.obj_functions import (dcopf_marginal_cost_objective,
+                                              copper_plate_marginal_cost_objective,
+                                              copper_plate_redispatch_cost_objective)
 
 
 def model(case: object, solver):
     #Create Model & Instance
     model = AbstractModel()
     instance = model.create_instance()
+    #instance.dual = Suffix(direction=Suffix.IMPORT)
 
     #Define Data Outputs
     output = {
@@ -71,9 +74,10 @@ def model(case: object, solver):
         ComponentName.PGmax, #Defined each timestep
         ComponentName.PGmin, #Defined each timestep
         ComponentName.PGMINGEN,
-        ComponentName.c0, #Defined each timestep
-        ComponentName.c1,
-        ComponentName.bid, #Defined each timestep
+        ComponentName.c_0, #Defined each timestep
+        ComponentName.c_1,
+        ComponentName.c_bid, #Defined each timestep
+        ComponentName.c_offer, #TODO - Define for each timestep
         ComponentName.baseMVA,
         ComponentName.SNSP_curtailment
     ]
@@ -82,6 +86,9 @@ def model(case: object, solver):
     #Define list of variables for model and add to model
     varlist = [
         ComponentName.pG,
+        ComponentName.pG_bid,
+        ComponentName.pG_offer,
+        ComponentName.u_g,
         ComponentName.pD,
         ComponentName.alpha,
         ComponentName.zeta_cg,
@@ -110,15 +117,13 @@ def model(case: object, solver):
     build_constraints(instance, constraintlist_network)
 
     #List of constraints for generators
-    #NOTE: All generators are forced to individual dispatch for initial copper run
+    #NOTE: Only the unit commitment generation constraint applies initially. This will be updated and 
+    #deleted/rebuilt within the iteration as required.
     constraintlist_gen = [
-        ComponentName.gen_forced_individual_realpower_max,
-        ComponentName.gen_forced_individual_realpower_min
+        ComponentName.gen_uc_max,
+        ComponentName.gen_uc_min
     ]
     build_constraints(instance, constraintlist_gen)
-
-    #Define Objective Function
-    instance.OBJ = Objective(rule = dcopf_marginal_cost_objective(instance), sense=minimize)
 
     #Define time dependent parameters
     ts_params = [ComponentName.PD,
@@ -128,7 +133,7 @@ def model(case: object, solver):
                 ComponentName.PGmin,
                 ComponentName.PGmax,
                 ComponentName.PGMINGEN,
-                ComponentName.bid] 
+                ComponentName.c_bid] 
 
     #Define time dependent sets
     ts_sets = [ComponentName.L_nonzero,
@@ -143,6 +148,9 @@ def model(case: object, solver):
 
         #~~~~~~~~~~~# COPPER PLATE MARKET MODEL SECTION #~~~~~~~~~~~#
         
+        #Set Objective
+        instance.OBJ = Objective(rule = copper_plate_marginal_cost_objective(instance), sense = minimize)
+
         #Solve Copperplate Model Run
         result["copper_market"][iteration] = pyosolve.solveinstance(instance, solver = solver)
 
@@ -163,25 +171,53 @@ def model(case: object, solver):
         #TODO - Currently this section only considers MINGEN, and not SNSP or other constraints.
         #     - Ideally it should also take into consideration all other secure constraints
         
-        #Delete individual dispatch pGUB (upper bound power output (i.e. pGMax) constraints (to be replaced below)
-        remove_component_from_instance(instance, [ComponentName.gen_forced_individual_realpower_max])
+        # #Delete individual dispatch pGUB (upper bound power output (i.e. pGMax) constraints (to be replaced below)
+        # remove_component_from_instance(instance, [ComponentName.gen_forced_individual_realpower_max])
         
-        ##Update PGmax parameter for non-synchronouse generators to the copper_market pG set-points
-        for generator in instance.G_ns:
-            instance.PGmax[generator] = instance.pG[generator].value
+        # #Define paramter pG_MARKET based on output of model
+        instance.pG_MARKET = Param(instance.G,
+                                   within = Reals,
+                                   initialize = instance.pG.extract_values(),
+                                   mutable = True)
+        
+        instance.U_MARKET = Param(instance.G,
+                                  within = Binary,
+                                  initialize = instance.u_g.extract_values(),
+                                  mutable = True)
+        
+        build_variables(instance, [ComponentName.prorata_constraint_zeta])
 
-        #Introduce constraint to enforce MINGEN (pG >= pGMINGEN) (superceeds PGMin) for ALL generators
-        #TODO - Replace with actual requirements from weekly constraints report
-        build_constraints(instance, [ComponentName.gen_mingen_redispatch_LB])
 
-       #Introduce constraint to re-dispatch down all non-synchronous generators pro-rata (pG = pGmax * mingen_zeta)
-        #Required as mingen generators will have be redispatched up
-        build_constraints(instance, [ComponentName.gen_mingen_redispatch_UB])
+        #PRACTICE BIG-M SECURITY CONSTRAINT
+        #If demand greater than 160, and wind generation <130, then G3 must be online
+        #create demand binary
+        if sum(instance.pD.extract_values().values()) >= (160/100):
+            y_d = 1
+        else:
+            y_d = 0
+        instance.y_D = Param(within = Binary,
+                             initialize = y_d)
+        #Create variables for generation and overall control
+        instance.y_G = Var(domain = Binary)
+        instance.y_G3 = Var(domain = Binary)
+        #Create big-M parameters
+        instance.M_G3_Upper = sum(instance.PGmax[g] for g in instance.G_ns) - (130/100)
+        instance.M_G3_Lower = (130/100) - sum(instance.PGmin[g] for g in instance.G_ns)
+        #Add constraints
+        instance.G3_MINGEN_M_Upper = Constraint(rule = (130/100) - sum(instance.pG[g] for g in instance.G_ns) <= instance.M_G3_Upper * instance.y_G)
+        instance.G3_MINGEN_M_Lower = Constraint(rule = sum(instance.pG[g] for g in instance.G_ns) - (130/100) <=  instance.M_G3_Lower * (1-instance.y_G))
+        instance.y_G_limit = Constraint(rule = instance.y_G3 <= instance.y_G)
+        instance.y_D_limit = Constraint(rule = instance.y_G3 <= instance.y_D)
+        instance.y_G3_limit = Constraint(rule = instance.y_G3 >= instance.y_D + instance.y_G - 1)
+        instance.G3_MUON = Constraint(rule = sum(instance.pG[g] for g in ['G3']) == 0.2 * instance.y_G3)
 
-        #Introduce constraint to enforce individual (pG = pGmax * mingen_zeta) PGmax for synchronous generators
-        build_constraints(instance, [ComponentName.gen_synchronous_individual_realpower_max])
-
- 
+        build_constraints(instance, [ComponentName.gen_redispatch,
+                                     ComponentName.gen_prorata_constraint_realpower,
+                                     ComponentName.gen_SNSP])
+        
+        #Delete previous market objective, and create new constrained export objective
+        instance.OBJ = Objective(rule = copper_plate_redispatch_cost_objective(instance), sense = minimize)
+                        
         #Solve Copperplate Model Run
         result["copper_constrained"][iteration] = pyosolve.solveinstance(instance, solver = solver)
 
@@ -197,20 +233,6 @@ def model(case: object, solver):
         output["copper_constrained"][iteration].param(instance)
         output["copper_constrained"][iteration].obj_value(instance)
 
-
-        #~~~~~~~~~~~# CREATE SNSP CONSTRAINT #~~~~~~~~~~~#
-        #NOTE Previous version had SNSP coded in as a parameter update following the copper_redipsatch to account for mingen
-        #NOTE It would be better to have this as a constraint in the previous section, however need to ensure linearity can be maintained
-
-        #Calculation of % of non-synchronous generation (as percent of generation)
-        synchronous_penetration = (sum(instance.pG[generator].value for generator in instance.G_ns)) / \
-                                (sum(instance.pG[generator].value for generator in instance.G_ns) + sum(instance.pG[generator].value for generator in instance.G_s))
-        
-        #Calculation of curtailment factor
-        if synchronous_penetration == 0:
-            instance.SNSP_curtailment = 0
-        else:
-            instance.SNSP_curtailment = 1 - max(min(0.75/synchronous_penetration, 1), 0)
 
         #~~~~~~~~~~~# DCOPF MODEL SECTION #~~~~~~~~~~~#
         #Update non-synchronous generator maximum outputs based on curtailment requirements, but while respecting PGmin of generators.
@@ -333,7 +355,7 @@ def model(case: object, solver):
                                    ]
         remove_component_from_instance(instance, remove_constraints_list, skip_missing = True)
         
-        #Reapply the timeseries constraints
+        #Reapply the first copperplate constraints
         build_constraints(instance, [ComponentName.gen_forced_individual_realpower_max,
                                      ComponentName.gen_forced_individual_realpower_min,
                                      ComponentName.KCL_copperplate])

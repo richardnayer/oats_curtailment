@@ -8,5 +8,5 @@ def solveinstance(instance, solver='appsi_highs'):
     This function solves the instance
     '''
     opt = SolverFactory(solver)
-    result = opt.solve(instance)
+    result = opt.solve(instance, tee=True)
     return result

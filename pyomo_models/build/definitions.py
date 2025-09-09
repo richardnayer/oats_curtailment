@@ -427,9 +427,17 @@ class Params_Blocks:
                 ),
                 mutable=True,
             ),
+            ComponentName.pG_MARKET: ParamDef(
+                index=ComponentName.G,
+                within=Reals,
+                initialize=lambda: helpers.get_PerUnit_param_dict(
+                    case, "generators", "name", "PGMINGEN", case.baseMVA
+                ),
+                mutable=True,
+            ),
 
             # GENERATOR COST PARAMETERS
-            ComponentName.c0: ParamDef(
+            ComponentName.c_0: ParamDef(
                 index=ComponentName.G,
                 within=Reals,
                 initialize=lambda: helpers.get_param_dict(
@@ -437,7 +445,7 @@ class Params_Blocks:
                 ),
                 mutable=False,
             ),
-            ComponentName.c1: ParamDef(
+            ComponentName.c_1: ParamDef(
                 index=ComponentName.G,
                 within=Reals,
                 initialize=lambda: helpers.get_param_dict(
@@ -445,11 +453,19 @@ class Params_Blocks:
                 ),
                 mutable=False,
             ),
-            ComponentName.bid: ParamDef(
+            ComponentName.c_bid: ParamDef(
                 index=ComponentName.G,
                 within=Reals,
                 initialize=lambda: helpers.get_param_dict(
                     case, "generators", "name", "bid"
+                ),
+                mutable=True,
+            ),
+            ComponentName.c_offer: ParamDef(
+                index=ComponentName.G,
+                within=Reals,
+                initialize=lambda: helpers.get_param_dict(
+                    case, "generators", "name", "offer"
                 ),
                 mutable=True,
             ),
@@ -484,8 +500,27 @@ class Variables_Blocks:
                 index=ComponentName.D,
                 domain=NonNegativeReals,
             ),
+            ComponentName.u_g: VarDef(
+                index=ComponentName.G,
+                domain=Binary,
+            ),
+
+            #Bid-Offer COntrol Variables
+            ComponentName.pG_offer: VarDef( #Positive deviation to set-point
+                index=ComponentName.G,
+                domain=NonNegativeReals,
+            ),
+            ComponentName.pG_bid: VarDef( #Negative deviation to set-point
+                index=ComponentName.G,
+                domain=NonNegativeReals,
+            ),
 
             #Pro-Rata Curtailment Control Variables
+            ComponentName.prorata_constraint_zeta: VarDef(
+                index=None,
+                domain=NonNegativeReals,
+                bounds=(0, 1),
+            ),
             ComponentName.zeta_cg: VarDef(
                 index=ComponentName.prorata_groups,
                 domain=NonNegativeReals,
@@ -585,6 +620,22 @@ class Constraint_Blocks:
                 == instance.PG[generator],
             ),
 
+            # --- Unit Commitment Min/Max Constraints ---
+            ComponentName.gen_uc_min: ConstraintDef(
+                index = ComponentName.G,
+                rule = lambda instance, generator: instance.pG[generator] >= instance.u_g[generator] * instance.PGmin[generator]
+            ),
+
+            ComponentName.gen_uc_max: ConstraintDef(
+                index = ComponentName.G,
+                rule = lambda instance, generator: instance.pG[generator] <= instance.u_g[generator] * instance.PGmax[generator]
+            ),
+
+            ComponentName.gen_redispatch: ConstraintDef(
+                index = ComponentName.G,
+                rule = lambda instance, generator: instance.pG[generator] == instance.pG_MARKET[generator] + instance.pG_offer[generator] - instance.pG_bid[generator]
+            ),
+
             # --- Mingen Requirements ---
             ComponentName.gen_mingen_redispatch_LB: ConstraintDef(
                 index=ComponentName.G,
@@ -634,8 +685,20 @@ class Constraint_Blocks:
                 rule=lambda instance, generator: instance.pG[generator]
                 >= instance.PGmin[generator],
             ),
-
+            # --- SNSP ---
+            ComponentName.gen_SNSP: ConstraintDef(
+                index=ComponentName.G_prorata,
+                rule=lambda instance, generator: sum(instance.pG[generator] for generator in instance.G_ns) <=
+                (0.75/(1-0.75)) * sum(instance.pG[generator] for generator in instance.G_s),
+            ),
             # --- Pro-Rata ERG Curtailment (As Defined by Generator Type) ---
+            ComponentName.gen_prorata_constraint_realpower: ConstraintDef(
+                index=ComponentName.G_prorata,
+                rule=lambda instance, generator: instance.pG[generator] == 
+                instance.pG_MARKET[generator] * instance.prorata_constraint_zeta,
+            ),
+
+            # --- Pro-Rata ERG Constraint (As Defined by Generator Type) ---
             ComponentName.gen_prorata_realpower_max: ConstraintDef(
                 index=ComponentName.G_prorata,
                 rule=lambda instance, generator: instance.pG[generator]

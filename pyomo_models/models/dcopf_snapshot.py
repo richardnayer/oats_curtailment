@@ -54,9 +54,9 @@ def model(case: object, solver):
         ComponentName.VOLL,
         ComponentName.PGmax,
         ComponentName.PGmin,
-        ComponentName.c0,
-        ComponentName.c1,
-        ComponentName.bid,
+        ComponentName.c_0,
+        ComponentName.c_1,
+        ComponentName.c_bid,
         ComponentName.baseMVA,
     ]
     build_params(instance, case, paramlist)
