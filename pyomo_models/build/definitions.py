@@ -427,7 +427,7 @@ class Params_Blocks:
                 ),
                 mutable=True,
             ),
-            ComponentName.pG_MARKET: ParamDef(
+            ComponentName.PG_MARKET: ParamDef(
                 index=ComponentName.G,
                 within=Reals,
                 initialize=lambda: helpers.get_PerUnit_param_dict(
@@ -631,9 +631,14 @@ class Constraint_Blocks:
                 rule = lambda instance, generator: instance.pG[generator] <= instance.u_g[generator] * instance.PGmax[generator]
             ),
 
-            ComponentName.gen_redispatch: ConstraintDef(
+            ComponentName.gen_market_redispatch: ConstraintDef(
                 index = ComponentName.G,
-                rule = lambda instance, generator: instance.pG[generator] == instance.pG_MARKET[generator] + instance.pG_offer[generator] - instance.pG_bid[generator]
+                rule = lambda instance, generator: instance.pG[generator] == instance.PG_MARKET[generator] + instance.pG_offer[generator] - instance.pG_bid[generator]
+            ),
+
+            ComponentName.gen_secure_redispatch: ConstraintDef(
+                index = ComponentName.G,
+                rule = lambda instance, generator: instance.pG[generator] == instance.PG_SECURE[generator] + instance.pG_offer[generator] - instance.pG_bid[generator]
             ),
 
             # --- Mingen Requirements ---
@@ -695,7 +700,7 @@ class Constraint_Blocks:
             ComponentName.gen_prorata_constraint_realpower: ConstraintDef(
                 index=ComponentName.G_prorata,
                 rule=lambda instance, generator: instance.pG[generator] == 
-                instance.pG_MARKET[generator] * instance.prorata_constraint_zeta,
+                instance.PG_MARKET[generator] * instance.prorata_constraint_zeta,
             ),
 
             # --- Pro-Rata ERG Constraint (As Defined by Generator Type) ---

@@ -79,7 +79,7 @@ def get_PerUnit_param_dict(case: object, component: str, index:str , param: floa
 
     #Filter df and return dictionary
     filtered_df = get_filtered_df(case, component, filter_param, operation, filter_value, [index,param])
-    return filtered_df.set_index(index)[param].div(baseMVA).to_dict()
+    return filtered_df.set_index(index)[param].div(baseMVA).round(6).to_dict()
 
 def get_PerUnit_param_list(case: object, component: str, param: float, baseMVA: float, filter_param: Union[str, float, int] = None, operation: str = None, filter_value: Union[str, float,int] = None) -> List[float]:
     '''Return a list mapping the index (e.g. generator name) to parameter scaled against baseMVA'''
@@ -96,7 +96,7 @@ def get_PerUnit_param_list(case: object, component: str, param: float, baseMVA: 
     
     #Filter df and return list
     filtered_df = get_filtered_df(case, component, filter_param, operation, filter_value, [param])
-    return filtered_df[param].div(baseMVA).to_list()
+    return filtered_df[param].div(baseMVA).round(6).to_list()
 
 def get_param_list(case: object, component: str, param: Union[str,float,int], filter_param: Union[str, float, int] = None, operation: str = None, filter_value: Union[str, float,int] = None) -> List[Union[str, float, int]]:
     '''Return list of components, optionally filtered by a parameter'''
@@ -227,6 +227,29 @@ def comma_param_to_dict(case: object, component: str, index: str, comma_param: s
                     .set_index(index)[comma_param]\
                     .dropna()\
                     .apply(lambda x: tuple(groups.strip() for groups in x.split(',')))\
+                    .to_dict()
+
+def comma_param_as_index_to_dict(case: object, component: str, val_param: str, comma_param: str, filter_param: Union[str, float, int] = None, operation: str = None, filter_value: Union[str, float,int] = None) -> Dict[str, tuple]:
+    '''
+    Used to split a comma separated parameter into tuples, and return a dictionary with the comma_param as the index and val_param as values
+    '''
+    if not hasattr(case, component):
+        raise AttributeError(f"Case object has no component '{component}'")
+    df = getattr(case, component)
+
+    #Check parameters exist in df
+    if comma_param not in df.columns:
+        raise KeyError(f"Parameter '{comma_param}' not found in '{component}' data")
+
+    #Filter df
+    filtered_df = get_filtered_df(case, component, filter_param, operation, filter_value, [val_param, comma_param])
+           
+    return filtered_df\
+                    .assign(**{comma_param: filtered_df[comma_param].str.split(r",\s*")})\
+                    .explode(comma_param)\
+                    .assign(**{comma_param: lambda df: df[comma_param].str.strip()})\
+                    .groupby(comma_param)[val_param]\
+                    .apply(list)\
                     .to_dict()
 
 def get_ordered_groupwise_combinations(case: object, component: str, index: str, group_param: str, ordered_param: str, filter_param: Union[str, float, int] = None, operation: str = None, filter_value: Union[str, float,int] = None, r: int = 2) -> List[tuple]:
@@ -375,5 +398,5 @@ def get_ts_param_dict(case, ts_param, timestep, filter_operation = None, filter_
         return df.to_dict()
 
     else:
-        return (df/baseMVA).to_dict()   
+        return (df/baseMVA).round(6).to_dict()   
 

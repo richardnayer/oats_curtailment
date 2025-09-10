@@ -90,6 +90,9 @@ class Case(UserDict):
 
             if config.get('index') != None:
                 df = df.set_index(config.get('index'))
+            
+            #Round values to reduce solver RHS differences
+            df = df.round(6)
 
             self[config['key']] = df
             logger.info(f"Loaded {len(df)} rows into '{config['key']}'")

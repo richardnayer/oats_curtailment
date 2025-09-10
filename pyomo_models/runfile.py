@@ -10,6 +10,15 @@ import pyomo_models.models.dcopf_snapshot as dcopf_snapshot
 import pyomo_models.models.dcopf_iterations as dcopf_iterations
 import pyomo_models.models.all_island_iterations_v2 as all_island_iterations
 
+# Set up logger
+import logging
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+handler = logging.StreamHandler()
+formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(message)s")
+handler.setFormatter(formatter)
+logger.addHandler(handler)
+
 def run_model(testcase = "end-to-end-testcase.xlsx", solver = "appsi_highs", model="DCOPF"):
 
 
