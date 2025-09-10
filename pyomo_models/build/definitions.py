@@ -521,17 +521,17 @@ class Variables_Blocks:
                 domain=NonNegativeReals,
                 bounds=(0, 1),
             ),
-            ComponentName.zeta_cg: VarDef(
+            ComponentName.xi_cg: VarDef(
                 index=ComponentName.prorata_groups,
                 domain=NonNegativeReals,
                 bounds=(0, 1),
             ),
-            ComponentName.zeta_wind: VarDef(
+            ComponentName.xi_prorata: VarDef(
                 index=ComponentName.G_prorata,
                 domain=NonNegativeReals,
                 bounds=(0, 1),
             ),
-            ComponentName.zeta_bin: VarDef(
+            ComponentName.beta_prorata: VarDef(
                 index=ComponentName.G_prorata_pairs,
                 domain=Binary,
             ),
@@ -704,48 +704,48 @@ class Constraint_Blocks:
             ),
 
             # --- Pro-Rata ERG Constraint (As Defined by Generator Type) ---
-            ComponentName.gen_prorata_realpower_max: ConstraintDef(
+            ComponentName.gen_prorata_realpower_max_xi: ConstraintDef(
                 index=ComponentName.G_prorata,
                 rule=lambda instance, generator: instance.pG[generator]
-                <= instance.PGmax[generator] * instance.zeta_wind[generator],
+                <= instance.PG_SECURE[generator] * instance.xi_prorata[generator],
             ),
             ComponentName.gen_prorata_realpower_min: ConstraintDef(
                 index=ComponentName.G_prorata,
                 rule=lambda instance, generator: instance.pG[generator]
-                >= instance.PGmin[generator],
+                >= instance.PG_SECURE[generator],
             ),
             #Constrains output of each generator to greater than or equal to the minimum defined value, multiplied by the 'zeta' operator, where zeta is a number between 0 -> 1.  \n
             #Should be defined against the set of pro-rata generators (model.G_prorata)
-            ComponentName.gen_prorata_realpower_min_zeta: ConstraintDef(
+            ComponentName.gen_prorata_realpower_min_xi: ConstraintDef(
                 index=ComponentName.G_prorata,
                 rule=lambda instance, generator: instance.pG[generator]
-                >= instance.PGmax[generator] * instance.zeta_wind[generator],
+                >= instance.PGmax[generator] * instance.xi_prorata[generator],
             ),
             #Constraint that ensures the 'zeta' operator for each generator, is less than or equal to the
             #'zeta' operator of all the constraint groups (cg) to which the generator belongs. \n
             #defined against the set of pairs of wind generators and their constraint groups.
-            ComponentName.gen_prorata_zeta_max: ConstraintDef(
+            ComponentName.gen_prorata_xi_max: ConstraintDef(
                 index=ComponentName.G_prorata_pairs,
-                rule=lambda instance, generator, cg: instance.zeta_wind[generator]
-                <= instance.zeta_cg[cg],
+                rule=lambda instance, generator, cg: instance.xi_prorata[generator]
+                <= instance.xi_cg[cg],
             ),
             #Constraint that ensures that the 'zeta' operator for each generator is greater than
             #at least one of the other 'zeta' operators within the constraint group. Note the inclusion
             #of the zeta_bin variable, which is a binary value.
             #defined against the set of pairs of wind generators and their constraint groups.
             #See link for more info on formulation: https://www.fico.com/fico-xpress-optimization/docs/dms2019-04/mipform/dhtml/chap2s1_sec_ssecminval.html
-            ComponentName.gen_prorata_zeta_min: ConstraintDef(
+            ComponentName.gen_prorata_xi_min: ConstraintDef(
                 index=ComponentName.G_prorata_pairs,
-                rule=lambda instance, generator, cg: instance.zeta_wind[generator]
-                >= instance.zeta_cg[cg] - (1 - 0) * (1 - instance.zeta_bin[(generator, cg)]),
+                rule=lambda instance, generator, cg: instance.xi_prorata[generator]
+                >= instance.xi_cg[cg] - (1 - 0) * (1 - instance.beta_prorata[(generator, cg)]),
             ),
             #Constraint that ensures that the sum of all of the binary 'zeta_bin' 
             #Should be defined against the set of wind generators
             #See link for more info on formulation: https://www.fico.com/fico-xpress-optimization/docs/dms2019-04/mipform/dhtml/chap2s1_sec_ssecminval.html
-            ComponentName.gen_prorata_zeta_binary: ConstraintDef(
+            ComponentName.gen_prorata_beta: ConstraintDef(
                 index=ComponentName.G_prorata,
                 rule=lambda instance, generator: sum(
-                    instance.zeta_bin[(generator, cg)]
+                    instance.beta_prorata[(generator, cg)]
                     for cg in instance.G_prorata_map[generator]
                 )
                 == 1,

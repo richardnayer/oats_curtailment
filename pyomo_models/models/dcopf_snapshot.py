@@ -66,9 +66,9 @@ def model(case: object, solver):
         ComponentName.pG,
         ComponentName.pD,
         ComponentName.alpha,
-        ComponentName.zeta_cg,
-        ComponentName.zeta_wind,
-        ComponentName.zeta_bin,
+        ComponentName.xi_cg,
+        ComponentName.xi_prorata,
+        ComponentName.beta_prorata,
         ComponentName.prorata_minimum_zeta,
         ComponentName.gamma,
         ComponentName.beta,
@@ -109,12 +109,12 @@ def model(case: object, solver):
 
     #List of constraints for ProRata generators
     constraintlist_gen_prorata = [
-        ComponentName.gen_prorata_realpower_max,
+        ComponentName.gen_prorata_realpower_max_xi,
         ComponentName.gen_prorata_realpower_min,
-        ComponentName.gen_prorata_realpower_min_zeta,
-        ComponentName.gen_prorata_zeta_max,
-        ComponentName.gen_prorata_zeta_min,
-        ComponentName.gen_prorata_zeta_binary,
+        ComponentName.gen_prorata_realpower_min_xi,
+        ComponentName.gen_prorata_xi_max,
+        ComponentName.gen_prorata_xi_min,
+        ComponentName.gen_prorata_beta,
     ]
 
     #List of constraints for individually controlled generators

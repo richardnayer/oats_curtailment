@@ -84,9 +84,9 @@ def model(case: object, solver):
         ComponentName.pG,
         ComponentName.pD,
         ComponentName.alpha,
-        ComponentName.zeta_cg,
-        ComponentName.zeta_wind,
-        ComponentName.zeta_bin,
+        ComponentName.xi_cg,
+        ComponentName.xi_prorata,
+        ComponentName.beta_prorata,
         ComponentName.prorata_minimum_zeta,
         ComponentName.MINGEN_zeta,
         ComponentName.gamma,
@@ -261,12 +261,12 @@ def model(case: object, solver):
                                    ]
         #Prorata Generator Constraints
         if [g for g in instance.G_prorata] != []:
-            gen_constraints_list += [ComponentName.gen_prorata_realpower_max,
+            gen_constraints_list += [ComponentName.gen_prorata_realpower_max_xi,
                                     ComponentName.gen_prorata_realpower_min,
-                                    ComponentName.gen_prorata_realpower_min_zeta,
-                                    ComponentName.gen_prorata_zeta_max,
-                                    ComponentName.gen_prorata_zeta_min,
-                                    ComponentName.gen_prorata_zeta_binary,
+                                    ComponentName.gen_prorata_realpower_min_xi,
+                                    ComponentName.gen_prorata_xi_max,
+                                    ComponentName.gen_prorata_xi_min,
+                                    ComponentName.gen_prorata_beta,
                                     ]
         #Individually Controlled Generator Constraints
         if [g for g in instance.G_individual] != []:
@@ -319,12 +319,12 @@ def model(case: object, solver):
                                    ComponentName.gen_LIFO_gamma,
                                    ComponentName.gen_LIFO_beta,
                                    #Prorata Generation Constraints
-                                   ComponentName.gen_prorata_realpower_max,
+                                   ComponentName.gen_prorata_realpower_max_xi,
                                    ComponentName.gen_prorata_realpower_min,
-                                   ComponentName.gen_prorata_realpower_min_zeta,
-                                   ComponentName.gen_prorata_zeta_max,
-                                   ComponentName.gen_prorata_zeta_min,
-                                   ComponentName.gen_prorata_zeta_binary,
+                                   ComponentName.gen_prorata_realpower_min_xi,
+                                   ComponentName.gen_prorata_xi_max,
+                                   ComponentName.gen_prorata_xi_min,
+                                   ComponentName.gen_prorata_beta,
                                    #Individual Generation Constraints
                                    ComponentName.gen_individual_realpower_max,
                                    ComponentName.gen_individual_realpower_min,

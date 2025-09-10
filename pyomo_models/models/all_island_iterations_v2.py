@@ -447,9 +447,9 @@ def model(case: object, solver):
         ComponentName.u_g,
         ComponentName.pD,
         ComponentName.alpha,
-        ComponentName.zeta_cg,
-        ComponentName.zeta_wind,
-        ComponentName.zeta_bin,
+        ComponentName.xi_cg,
+        ComponentName.xi_prorata,
+        ComponentName.beta_prorata,
         ComponentName.prorata_minimum_zeta,
         ComponentName.prorata_curtailment_zeta,
         ComponentName.MINGEN_zeta,
@@ -547,7 +547,6 @@ def model(case: object, solver):
         MUON_NB_constraints(case, instance, selected_constraints = ['S_NBMIN_DUB_L2'])
         #- NB Big-M Constraints
         MUON_NB_BigM_constraints(case, instance, selected_constraints = ['S_NBMIN_CPS','S_NBMIN_MP_NB'])
-        #'S_NBMIN_CPS'
 
         #Update Objective
         instance.del_component(instance.OBJ)
@@ -592,54 +591,40 @@ def model(case: object, solver):
         remove_component_from_instance(instance, constraints_to_remove)
 
         #Add in network constraints
-        build_constraints(instance, [#Kirchoffs Current Law
-                                               ComponentName.KCL_networked_realpower_noshunt,
-                                               
-                                               #Kirchoffs Voltage Law
-                                               ComponentName.KVL_DCOPF_lines,
-                                               ComponentName.KVL_DCOPF_transformer,
-                                               
-                                               #Power Line Operational Limits
-                                               ComponentName.line_cont_realpower_max_ngtve,
-                                               ComponentName.line_cont_realpower_max_pstve,
-                                               ComponentName.volts_line_delta,
+        build_constraints(instance, [#Power Balance - Kirchoffs Current Law (P
+                                     ComponentName.KCL_networked_realpower_noshunt,
+                                    
+                                     #Power Flow - Kirchoffs Voltage Law
+                                     ComponentName.KVL_DCOPF_lines,
+                                     ComponentName.KVL_DCOPF_transformer,
+                                    
+                                     #Power Flow - Power Line Operational Limits
+                                     ComponentName.line_cont_realpower_max_ngtve,
+                                     ComponentName.line_cont_realpower_max_pstve,
+                                     ComponentName.volts_line_delta,
 
-                                               #Transformer Line Operational Limits
-                                               ComponentName.transf_continuous_real_max_ngtve,
-                                               ComponentName.transf_continuous_real_max_pstve,
-                                               ComponentName.volts_transformer_delta,
+                                     #Power Flow - Transformer Line Operational Limits
+                                     ComponentName.transf_continuous_real_max_ngtve,
+                                     ComponentName.transf_continuous_real_max_pstve,
+                                     ComponentName.volts_transformer_delta,
 
-                                               #Reference bus voltage
-                                               ComponentName.volts_reference_bus
-                                               ])
+                                     #Reference bus voltage
+                                     ComponentName.volts_reference_bus,
+
+                                     #Redispatch COnstraint
+                                     ComponentName.gen_secure_redispatch,
+
+                                     #Pro-Rata Constraint Group Constraints
+                                     ComponentName.gen_prorata_realpower_max_xi,
+                                     ComponentName.gen_prorata_realpower_min_xi,
+                                     ComponentName.gen_prorata_xi_max,
+                                     ComponentName.gen_prorata_xi_min,
+                                     ComponentName.gen_prorata_beta,
+                                    ])
         
-        #Add in generator constraints
-        gen_constraints_list = []
-        #LIFO Generator Constraints
-        if [g for g in instance.G_LIFO] != []:
-            gen_constraints_list += [ComponentName.gen_LIFO_realpower_max,
-                                    ComponentName.gen_LIFO_realpower_min,
-                                    ComponentName.gen_LIFO_gamma,
-                                    ComponentName.gen_LIFO_beta,
-                                   ]
-        #Prorata Generator Constraints
-        if [g for g in instance.G_prorata] != []:
-            gen_constraints_list += [ComponentName.gen_prorata_realpower_max,
-                                    ComponentName.gen_prorata_realpower_min,
-                                    ComponentName.gen_prorata_realpower_min_zeta,
-                                    ComponentName.gen_prorata_zeta_max,
-                                    ComponentName.gen_prorata_zeta_min,
-                                    ComponentName.gen_prorata_zeta_binary,
-                                    ]
-        #Individually Controlled Generator Constraints
-        if [g for g in instance.G_individual] != []:
-            gen_constraints_list += [ComponentName.gen_individual_realpower_max,
-                                    ComponentName.gen_individual_realpower_min,
-                                   ]
-        if [g for g in instance.G_uncontrollable] != []:
-            gen_constraints_list += [ComponentName.gen_uncontrollable_realpower_sp]
-
-        build_constraints(instance, gen_constraints_list)
+        #Update Objective
+        instance.del_component(instance.OBJ)
+        instance.OBJ = Objective(rule = redispatch_from_secure_cost_objective(instance), sense = minimize)
 
 
         #Solve DCOPF Model Run
@@ -682,12 +667,12 @@ def model(case: object, solver):
                                    ComponentName.gen_LIFO_gamma,
                                    ComponentName.gen_LIFO_beta,
                                    #Prorata Generation Constraints
-                                   ComponentName.gen_prorata_realpower_max,
+                                   ComponentName.gen_prorata_realpower_max_xi,
                                    ComponentName.gen_prorata_realpower_min,
-                                   ComponentName.gen_prorata_realpower_min_zeta,
-                                   ComponentName.gen_prorata_zeta_max,
-                                   ComponentName.gen_prorata_zeta_min,
-                                   ComponentName.gen_prorata_zeta_binary,
+                                   ComponentName.gen_prorata_realpower_min_xi,
+                                   ComponentName.gen_prorata_xi_max,
+                                   ComponentName.gen_prorata_xi_min,
+                                   ComponentName.gen_prorata_beta,
                                    #Individual Generation Constraints
                                    ComponentName.gen_individual_realpower_max,
                                    ComponentName.gen_individual_realpower_min,
