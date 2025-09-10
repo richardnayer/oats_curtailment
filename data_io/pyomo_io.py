@@ -1,5 +1,6 @@
 from pyomo.environ import *
 import pandas as pd
+import functools
 
 class InstanceCache:
     def __init__(self, result, data_to_cache, options=None):
@@ -8,6 +9,12 @@ class InstanceCache:
         self.headers = None
         self.options = options
         self.obj = 0
+
+    @staticmethod
+    def _rgetattr(obj, attr, *args):
+        def _getattr(obj, attr):
+            return getattr(obj, attr, *args)
+        return functools.reduce(_getattr, [obj] + attr.split('.'))
 
     #Add objective to object
     def obj_value(self, instance):
@@ -34,7 +41,7 @@ class InstanceCache:
 
         #Iterator through all params in param_list, extract value and add to object
         for p in param_list:
-            paramobject = getattr(instance, str(p))
+            paramobject = InstanceCache._rgetattr(instance, str(p))
             # print(paramobject)
             
             # Use a generator to assign index-value pairs directly to the attribute
@@ -56,12 +63,13 @@ class InstanceCache:
 
         #Iterator through all variables in var_list, extract value and add to object
         for v in var_list:
-            varobject = getattr(instance, str(v))
+            varobject = InstanceCache._rgetattr(instance, str(v))
             # print(str(v), {index: varobject[index].value if "pyomo" in str(type(varobject[index])) else varobject[index]
             #                        for index in varobject})
             # Use a generator to assign index-value pairs directly to the attribute
             setattr(self, str(v), {index: varobject[index].value if "pyomo" in str(type(varobject[index])) else varobject[index]
                                    for index in varobject})
+            
                
     #Add Sets to Object
     def set(self, instance):
@@ -78,7 +86,7 @@ class InstanceCache:
 
         #Iterator through all sets in set_list, extract data and add to object
         for s in set_list:
-            setobject = getattr(instance, str(s))
+            setobject = InstanceCache._rgetattr(instance, str(s))
             setattr(self, str(s), setobject.data())
             
     def output(self, table_list=None):

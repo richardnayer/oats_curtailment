@@ -2,6 +2,7 @@ from pyomo_models.build.definitions import *
 from pyomo_models.build.build_functions import *
 from pyomo_models.build.names import *
 
+import functools
 import data_io.pyomo_io as pyomo_io
 import pyomo_models.build.pyosolve as pyosolve
 from pyomo_models.build.obj_functions import (dcopf_marginal_cost_objective,
@@ -82,23 +83,24 @@ def MUON_MW_constraints(case, instance, selected_constraints = None):
         added_sets += [constraint]
     print(f"Sets for the following MW contraints have been added to the model \n {added_sets}")
            
+    #Add Constraints into Model
+    instance.MUON_MW = Block()
 
     added_constraints = []
     for constraint in selected_constraints:
-        
         #Apply LB constraint (checks if callable function for bounds with a formula)
         if constraint_dict.get(constraint).get('PG_LB') is not None:
             if callable(constraint_dict.get(constraint).get('PG_LB')) == False:
-                instance.add_component(constraint+'_LB', Constraint(rule = sum(instance.pG[g] for g in getattr(instance, 'G_'+constraint)) >= constraint_dict.get(constraint).get('PG_LB')))
+                instance.MUON_MW.add_component(constraint+'_LB', Constraint(rule = sum(instance.pG[g] for g in getattr(instance, 'G_'+constraint)) >= constraint_dict.get(constraint).get('PG_LB')))
             else:
-                instance.add_component(constraint+'_LB', Constraint(rule = sum(instance.pG[g] for g in getattr(instance, 'G_'+constraint)) >= constraint_dict.get(constraint).get('PG_LB')()))
+                instance.MUON_MW.add_component(constraint+'_LB', Constraint(rule = sum(instance.pG[g] for g in getattr(instance, 'G_'+constraint)) >= constraint_dict.get(constraint).get('PG_LB')()))
             added_constraints += [constraint+'_LB']
         #Apply UB constraint (checks if callable function for bounds with a formula)
         if constraint_dict.get(constraint).get('PG_UB') is not None:
             if callable(constraint_dict.get(constraint).get('PG_UB')) == False:
-                instance.add_component(constraint+'_UB', Constraint(rule = sum(instance.pG[g] for g in getattr(instance, 'G_'+constraint)) <= constraint_dict.get(constraint).get('PG_UB')))
+                instance.MUON_MW.add_component(constraint+'_UB', Constraint(rule = sum(instance.pG[g] for g in getattr(instance, 'G_'+constraint)) <= constraint_dict.get(constraint).get('PG_UB')))
             else:
-                instance.add_component(constraint+'_UB', Constraint(rule = sum(instance.pG[g] for g in getattr(instance, 'G_'+constraint)) <= constraint_dict.get(constraint).get('PG_UB')()))
+                instance.MUON_MW.add_component(constraint+'_UB', Constraint(rule = sum(instance.pG[g] for g in getattr(instance, 'G_'+constraint)) <= constraint_dict.get(constraint).get('PG_UB')()))
             added_constraints += [constraint+'_UB']
 
 
@@ -176,7 +178,11 @@ def MUON_NB_constraints(case, instance, selected_constraints = None):
         instance.add_component('G_'+constraint, constraint_set)
         added_sets += [constraint]
     print(f"The following NB contraint sets have been added to the model \n {added_sets}")
-            
+    
+
+    #Add Constraints to Model
+    instance.MUON_NB = Block()
+
     added_constraints = []
     for constraint in selected_constraints:
         #Check if a condition applies to constraint. if it does and isn't met then continue to next constraint
@@ -184,20 +190,21 @@ def MUON_NB_constraints(case, instance, selected_constraints = None):
             if constraint_dict.get(constraint).get('Condition')() == False:
                 print(f"The requirement for constraint {constraint} to apply has not been met, so it has not been applied")
                 continue
+    
             
         #Apply LB constraint (checks if callable function for bounds with a formula)
         if constraint_dict.get(constraint).get('Ug_LB') is not None:
             if callable(constraint_dict.get(constraint).get('Ug_LB')) == False:
-                instance.add_component(constraint+'_LB', Constraint(rule = sum(instance.u_g[g] for g in getattr(instance, 'G_'+constraint)) >= constraint_dict.get(constraint).get('Ug_LB')))
+                instance.MUON_NB.add_component(constraint+'_LB', Constraint(rule = sum(instance.u_g[g] for g in getattr(instance, 'G_'+constraint)) >= constraint_dict.get(constraint).get('Ug_LB')))
             else:
-                instance.add_component(constraint+'_LB', Constraint(rule = sum(instance.u_g[g] for g in getattr(instance, 'G_'+constraint)) >= constraint_dict.get(constraint).get('Ug_LB')()))
+                instance.MUON_NB.add_component(constraint+'_LB', Constraint(rule = sum(instance.u_g[g] for g in getattr(instance, 'G_'+constraint)) >= constraint_dict.get(constraint).get('Ug_LB')()))
             added_constraints += [constraint+'_LB']
         #Apply UB constraint (checks if callable function for bounds with a formula)
         if constraint_dict.get(constraint).get('Ug_UB') is not None:
             if callable(constraint_dict.get(constraint).get('Ug_UB')) == False:
-                instance.add_component(constraint+'_UB', Constraint(rule = sum(instance.u_g[g] for g in getattr(instance, 'G_'+constraint)) <= constraint_dict.get(constraint).get('Ug_UB')))
+                instance.MUON_NB.add_component(constraint+'_UB', Constraint(rule = sum(instance.u_g[g] for g in getattr(instance, 'G_'+constraint)) <= constraint_dict.get(constraint).get('Ug_UB')))
             else:
-                instance.add_component(constraint+'_UB', Constraint(rule = sum(instance.u_g[g] for g in getattr(instance, 'G_'+constraint)) <= constraint_dict.get(constraint).get('Ug_UB')()))
+                instance.MUON_NB.add_component(constraint+'_UB', Constraint(rule = sum(instance.u_g[g] for g in getattr(instance, 'G_'+constraint)) <= constraint_dict.get(constraint).get('Ug_UB')()))
             added_constraints += [constraint+'_UB']
 
 
@@ -231,7 +238,6 @@ def MUON_NB_BigM_constraints(case, instance, selected_constraints = None):
         instance.add_component('G_'+constraint, constraint_set)
         added_sets += [constraint]
     print(f"The following NB contraint sets have been added to the model \n {added_sets}")
-    
 
     constraint_dict={
             "S_NBMIN_CPS": {
@@ -250,6 +256,9 @@ def MUON_NB_BigM_constraints(case, instance, selected_constraints = None):
 
     }
 
+    #Constraints Block
+    instance.MUON_NB_BigM = Block()
+
     if "S_NBMIN_CPS" in selected_constraints:
         #TODO Update limit values to real Ireland system
 
@@ -258,21 +267,21 @@ def MUON_NB_BigM_constraints(case, instance, selected_constraints = None):
             y_D_CPS = 1
         else:
             y_D_CPS = 0
-        instance.bMparam_y_D_CPS = Param(within = Binary, initialize = y_D_CPS)
+        instance.MUON_NB_BigM.bMparam_y_D_CPS = Param(within = Binary, initialize = y_D_CPS)
         
         #Create variables for generation and overall control
-        instance.bMvar_y_G_CPS = Var(domain = Binary)
-        instance.bMvar_y_CPS = Var(domain = Binary)
+        instance.MUON_NB_BigM.bMvar_y_G_CPS = Var(domain = Binary)
+        instance.MUON_NB_BigM.bMvar_y_CPS = Var(domain = Binary)
         #Create big-M parameters
-        instance.bMparam_M_G_CPS_L = constraint_dict["S_NBMIN_CPS"]["pGlim"] - sum(instance.PGmin[g] for g in instance.G_NI_Wind)
-        instance.bMparam_M_G_CPS_U = sum(instance.PGmax[g] for g in instance.G_NI_Wind) - constraint_dict["S_NBMIN_CPS"]["pGlim"]
+        instance.MUON_NB_BigM.bMparam_M_G_CPS_L = constraint_dict["S_NBMIN_CPS"]["pGlim"] - sum(instance.PGmin[g] for g in instance.G_NI_Wind)
+        instance.MUON_NB_BigM.bMparam_M_G_CPS_U = sum(instance.PGmax[g] for g in instance.G_NI_Wind) - constraint_dict["S_NBMIN_CPS"]["pGlim"]
         #Add constraints
-        instance.bMconst_M_CPS_L = Constraint(rule = constraint_dict["S_NBMIN_CPS"]["pGlim"] - sum(instance.pG[g] for g in instance.G_NI_Wind) <= instance.bMparam_M_G_CPS_L * instance.bMvar_y_G_CPS)
-        instance.bMconst_M_CPS_U = Constraint(rule = sum(instance.pG[g] for g in instance.G_NI_Wind) - constraint_dict["S_NBMIN_CPS"]["pGlim"] <=  instance.bMparam_M_G_CPS_U * (1-instance.bMvar_y_G_CPS))
-        instance.bMconst_y_G_CPS_limit = Constraint(rule = instance.bMvar_y_CPS <= instance.bMvar_y_G_CPS)
-        instance.bMconst_y_D_CPS_limit = Constraint(rule = instance.bMvar_y_CPS <= instance.bMparam_y_D_CPS)
-        instance.bMconst_y_CPS_limit = Constraint(rule = instance.bMvar_y_CPS >= instance.bMparam_y_D_CPS + instance.bMvar_y_G_CPS - 1)
-        instance.S_NBMIN_CPS = Constraint(rule = sum(instance.u_g[g] for g in instance.G_S_NBMIN_CPS) >= constraint_dict["S_NBMIN_CPS"]["Ug_LB"] * instance.bMvar_y_CPS)
+        instance.MUON_NB_BigM.bMconst_M_CPS_L = Constraint(rule = constraint_dict["S_NBMIN_CPS"]["pGlim"] - sum(instance.pG[g] for g in instance.G_NI_Wind) <= instance.MUON_NB_BigM.bMparam_M_G_CPS_L * instance.MUON_NB_BigM.bMvar_y_G_CPS)
+        instance.MUON_NB_BigM.bMconst_M_CPS_U = Constraint(rule = sum(instance.pG[g] for g in instance.G_NI_Wind) - constraint_dict["S_NBMIN_CPS"]["pGlim"] <=  instance.MUON_NB_BigM.bMparam_M_G_CPS_U * (1-instance.MUON_NB_BigM.bMvar_y_G_CPS))
+        instance.MUON_NB_BigM.bMconst_y_G_CPS_limit = Constraint(rule = instance.MUON_NB_BigM.bMvar_y_CPS <= instance.MUON_NB_BigM.bMvar_y_G_CPS)
+        instance.MUON_NB_BigM.bMconst_y_D_CPS_limit = Constraint(rule = instance.MUON_NB_BigM.bMvar_y_CPS <= instance.MUON_NB_BigM.bMparam_y_D_CPS)
+        instance.MUON_NB_BigM.bMconst_y_CPS_limit = Constraint(rule = instance.MUON_NB_BigM.bMvar_y_CPS >= instance.MUON_NB_BigM.bMparam_y_D_CPS + instance.MUON_NB_BigM.bMvar_y_G_CPS - 1)
+        instance.MUON_NB_BigM.S_NBMIN_CPS = Constraint(rule = sum(instance.u_g[g] for g in instance.G_S_NBMIN_CPS) >= constraint_dict["S_NBMIN_CPS"]["Ug_LB"] * instance.MUON_NB_BigM.bMvar_y_CPS)
         print(f"Big-M NB constraint [S_NBMIN_CPS] added to instance")
 
 
@@ -282,14 +291,14 @@ def MUON_NB_BigM_constraints(case, instance, selected_constraints = None):
         #TODO Ensure generation is for wind generation in NI only
 
         #Create variables for generation and overall control
-        instance.bMvar_y_G_MP_NB = Var(domain = Binary)
+        instance.MUON_NB_BigM.bMvar_y_G_MP_NB = Var(domain = Binary)
         #Create big-M parameters
-        instance.bMparam_M_G_MP_NB_L = constraint_dict["S_NBMIN_MP_NB"]["pGlim"] - sum(instance.PGmin[g] for g in instance.G_ns)
-        instance.bMparam_M_G_MP_NB_U = sum(instance.PGmax[g] for g in instance.G_ns) - constraint_dict["S_NBMIN_MP_NB"]["pGlim"]
+        instance.MUON_NB_BigM.bMparam_M_G_MP_NB_L = constraint_dict["S_NBMIN_MP_NB"]["pGlim"] - sum(instance.PGmin[g] for g in instance.G_ns)
+        instance.MUON_NB_BigM.bMparam_M_G_MP_NB_U = sum(instance.PGmax[g] for g in instance.G_ns) - constraint_dict["S_NBMIN_MP_NB"]["pGlim"]
         #Add constraints
-        instance.bMconst_M_MP_NB_L = Constraint(rule = constraint_dict["S_NBMIN_MP_NB"]["pGlim"] - sum(instance.pG[g] for g in instance.G_ns) <= instance.bMparam_M_G_MP_NB_L * instance.bMvar_y_G_MP_NB)
-        instance.bMconst_M_MP_NB_U = Constraint(rule = sum(instance.pG[g] for g in instance.G_ns) - constraint_dict["S_NBMIN_MP_NB"]["pGlim"] <=  instance.bMparam_M_G_MP_NB_U * (1-instance.bMvar_y_G_MP_NB))
-        instance.S_NBMIN_MP_NB = Constraint(rule = sum(instance.u_g[g] for g in instance.G_S_NBMIN_MP_NB) >= constraint_dict["S_NBMIN_MP_NB"]["Ug_LB"] * instance.bMvar_y_G_MP_NB)
+        instance.MUON_NB_BigM.bMconst_M_MP_NB_L = Constraint(rule = constraint_dict["S_NBMIN_MP_NB"]["pGlim"] - sum(instance.pG[g] for g in instance.G_ns) <= instance.MUON_NB_BigM.bMparam_M_G_MP_NB_L * instance.MUON_NB_BigM.bMvar_y_G_MP_NB)
+        instance.MUON_NB_BigM.bMconst_M_MP_NB_U = Constraint(rule = sum(instance.pG[g] for g in instance.G_ns) - constraint_dict["S_NBMIN_MP_NB"]["pGlim"] <=  instance.MUON_NB_BigM.bMparam_M_G_MP_NB_U * (1-instance.MUON_NB_BigM.bMvar_y_G_MP_NB))
+        instance.MUON_NB_BigM.S_NBMIN_MP_NB = Constraint(rule = sum(instance.u_g[g] for g in instance.G_S_NBMIN_MP_NB) >= constraint_dict["S_NBMIN_MP_NB"]["Ug_LB"] * instance.MUON_NB_BigM.bMvar_y_G_MP_NB)
         print(f"Big-M NB constraint [S_NBMIN_MP_NB] added to instance")
 
   
@@ -439,6 +448,28 @@ def model(case: object, solver):
                 ComponentName.PGMINGEN,
                 ComponentName.c_bid] 
 
+    #Special Model Parameters
+    instance.PG_MARKET = Param(instance.G,
+                            within = Reals,
+                            initialize = {g: 0 for g in instance.G},
+                            mutable = True)
+
+    instance.UG_MARKET = Param(instance.G,
+                                within = Binary,
+                                initialize = {g: 0 for g in instance.G},
+                                mutable = True) 
+
+    #Special Model Parameters
+    instance.PG_SECURE = Param(instance.G,
+                            within = Reals,
+                            initialize = {g: 0 for g in instance.G},
+                            mutable = True)
+
+    instance.UG_SECURE = Param(instance.G,
+                                within = Binary,
+                                initialize = {g: 0 for g in instance.G},
+                                mutable = True) 
+
     #Define list of variables for model and add to model
     varlist = [
         ComponentName.pG,
@@ -463,25 +494,90 @@ def model(case: object, solver):
     ]
     build_variables(instance, varlist)
 
-    # #Define list of network constraints for model and add to model
-    # #NOTE: The constraints are copper constraints, so network constraints are disregarded
-    # constraintlist_network = [
-    #     ComponentName.KCL_copperplate,
-    #     ComponentName.demand_real_alpha_controlled,
-    #     ComponentName.demand_alpha_max,
-    #     ComponentName.demand_alpha_fixneg,
-    # ]
-    # build_constraints(instance, constraintlist_network)
+    #Preload First Iteration Params & Sets
+    add_iteration_params_to_instance(instance, case, ts_params, case.iterations[0])
+    add_iteration_sets_to_instance(instance, case, ts_sets, case.iterations[0])
 
-    #List of constraints for generators
-    #NOTE: Only the unit commitment generation constraint applies initially. This will be updated and 
-    #deleted/rebuilt within the iteration as required.
-    # constraintlist_gen = [
-    #     ComponentName.gen_uc_max,
-    #     ComponentName.gen_uc_min
-    # ]
-    # build_constraints(instance, constraintlist_gen)
+    #COPPER PLATE MARKET MODEL CONSTRAINTS #
+    copper_plate_market_constraints = [#Power Balance & Demand Constraints
+                                ComponentName.KCL_copperplate,
+                                ComponentName.demand_real_alpha_controlled,
+                                ComponentName.demand_alpha_max,
+                                ComponentName.demand_alpha_fixneg,
+                                 
+                                 #Generation Constraints
+                                 ComponentName.gen_uc_max,
+                                 ComponentName.gen_uc_min]
+    build_constraints(instance, copper_plate_market_constraints)
 
+    #COPPER PLATE SECURE MODEL CONSTRAINTS #
+    copper_plate_secure_constraints = [#constraints for market re-dispatch, pro-rata cosntraint, and SNSP
+                                ComponentName.gen_market_redispatch,
+                                ComponentName.gen_prorata_curtailment_realpower,
+                                ComponentName.gen_SNSP]
+    build_constraints(instance, copper_plate_secure_constraints)
+        
+    #- MUON MW Constraints
+    MUON_MW_constraint_list = ['S_MWMAX_NI_GT', 'S_REP_ROI']
+    MUON_MW_constraints(case, instance, selected_constraints = MUON_MW_constraint_list)
+    #- MUON NB Constraints
+    MUON_NB_constraints_list = ['S_NBMIN_DUB_L2']
+    MUON_NB_constraints(case, instance, selected_constraints = MUON_NB_constraints_list)
+    #- MUON NB Big-M Constraints
+    MUON_NB_bigM_constraints_list = ['S_NBMIN_CPS','S_NBMIN_MP_NB']
+    MUON_NB_BigM_constraints(case, instance, selected_constraints = MUON_NB_bigM_constraints_list)
+
+    #DCOPF MODEL CONSTRAINTS #
+    dcopf_constraints = [#Power Balance - Kirchoffs Current Law (P
+                        ComponentName.KCL_networked_realpower_noshunt,
+                    
+                        #Power Flow - Kirchoffs Voltage Law
+                        ComponentName.KVL_DCOPF_lines,
+                        ComponentName.KVL_DCOPF_transformer,
+                    
+                        #Power Flow - Power Line Operational Limits
+                        ComponentName.line_cont_realpower_max_ngtve,
+                        ComponentName.line_cont_realpower_max_pstve,
+                        ComponentName.volts_line_delta,
+
+                        #Power Flow - Transformer Line Operational Limits
+                        ComponentName.transf_continuous_real_max_ngtve,
+                        ComponentName.transf_continuous_real_max_pstve,
+                        ComponentName.volts_transformer_delta,
+
+                        #Reference bus voltage
+                        ComponentName.volts_reference_bus,
+
+                        #Redispatch COnstraint
+                        ComponentName.gen_secure_redispatch,
+
+                        #Pro-Rata Constraint Group Constraints
+                        ComponentName.gen_prorata_realpower_max_xi,
+                        ComponentName.gen_prorata_realpower_min_xi,
+                        ComponentName.gen_prorata_xi_max,
+                        ComponentName.gen_prorata_xi_min,
+                        ComponentName.gen_prorata_beta,
+                    ]
+    build_constraints(instance, dcopf_constraints)
+
+    #Deactivate all constraints ready for iteration
+    global_constraints = ['KCL_copperplate', 'demand_real_alpha_controlled', 'demand_alpha_max', 'demand_alpha_fixneg', 'gen_uc_max', 'gen_uc_min', 'gen_market_redispatch', 'gen_prorata_curtailment_realpower', 'gen_SNSP', 'KCL_networked_realpower_noshunt', 'KVL_DCOPF_lines', 'KVL_DCOPF_transformer', 'line_cont_realpower_max_ngtve', 'line_cont_realpower_max_pstve', 'volts_line_delta', 'transf_continuous_real_max_ngtve', 'transf_continuous_real_max_pstve', 'volts_transformer_delta', 'volts_reference_bus', 'gen_secure_redispatch', 'gen_prorata_realpower_max_xi', 'gen_prorata_realpower_min_xi', 'gen_prorata_xi_max', 'gen_prorata_xi_min', 'gen_prorata_beta']
+    block_constraints =  ['MUON_MW', 'MUON_NB', 'MUON_NB_BigM']
+
+    for c in global_constraints:
+        getattr(instance, c).deactivate()
+
+    for block in block_constraints:
+        getattr(instance, block).deactivate()
+
+
+
+
+
+
+
+
+    #MODEL ITERATIONS
     for iteration in case.iterations:
         #Update parameters for current timestep
         add_iteration_params_to_instance(instance, case, ts_params, iteration)
@@ -490,33 +586,31 @@ def model(case: object, solver):
         add_iteration_sets_to_instance(instance, case, ts_sets, iteration)
 
         #~~~~~~~~~~~# COPPER PLATE MARKET MODEL SECTION #~~~~~~~~~~~#
-        #Add Power Balance & Demand Constraints
-        build_constraints(instance, [ComponentName.KCL_copperplate,
-                                     ComponentName.demand_real_alpha_controlled,
-                                     ComponentName.demand_alpha_max,
-                                     ComponentName.demand_alpha_fixneg])
-
-        #Add Generation Constraints
-        build_constraints(instance, [ComponentName.gen_uc_max,
-                                     ComponentName.gen_uc_min])
-
-
+        market_constraints_to_activate = [#Add Power Balance & Demand
+                                   ComponentName.KCL_copperplate,
+                                   ComponentName.demand_real_alpha_controlled,
+                                   ComponentName.demand_alpha_max,
+                                   ComponentName.demand_alpha_fixneg,
+                                   #Add Generation Constraints
+                                   ComponentName.gen_uc_max,
+                                   ComponentName.gen_uc_min
+                                ]
+        
+        for c in market_constraints_to_activate:
+            getattr(instance, c).activate()
+        
         #Set Objective
         instance.OBJ = Objective(rule = copper_plate_marginal_cost_objective(instance), sense = minimize)
 
         #Solve Copperplate Model Run
         result["copper_market"][iteration] = pyosolve.solveinstance(instance, solver = solver)
 
-        #Define paramter pG_MARKET based on output of model (rounding pG to improve solver function)
-        instance.PG_MARKET = Param(instance.G,
-                                   within = Reals,
-                                   initialize = {g: round(instance.pG[g].value, 6) for g in instance.pG},
-                                   mutable = True)
-        
-        instance.UG_MARKET = Param(instance.G,
-                                  within = Binary,
-                                  initialize = instance.u_g.extract_values(),
-                                  mutable = True)    
+        #Define Output Parameters
+        for g in instance.G:
+            instance.PG_MARKET[g] = round(instance.pG[g].value, 6)
+
+        for g in instance.G:
+            instance.UG_MARKET[g] = round(instance.u_g[g].value, 0)
 
         #Define Data to Save
         data_to_cache = {"Var": [], 
@@ -531,22 +625,22 @@ def model(case: object, solver):
         output["copper_market"][iteration].obj_value(instance)
 
         #~~~~~~~~~~~# COPPER PLATE 'SECURE' MODEL SECTION #~~~~~~~~~~~#
-        
-        #Add Pro-Rata Constraint Variables to Model
-        build_variables(instance, [ComponentName.prorata_curtailment_zeta])
+        #Add Constraints (Except MUON Constraints)
+        secure_constraints_to_activate = [#Market Redispatch
+                                         ComponentName.gen_market_redispatch,
+                                         #Prorata Curtailment
+                                         ComponentName.gen_prorata_curtailment_realpower,
+                                         #SNSP
+                                         ComponentName.gen_SNSP
+                                         ]
 
-        #Add constraints for market re-dispatch, pro-rata cosntraint, and SNSP
-        build_constraints(instance, [ComponentName.gen_market_redispatch,
-                                     ComponentName.gen_prorata_curtailment_realpower,
-                                     ComponentName.gen_SNSP])
-        
-        #Add MUON COnstraints
-        #- MW Constraints
-        MUON_MW_constraints(case, instance, selected_constraints = ['S_MWMAX_NI_GT', 'S_REP_ROI'])
-        #- NB Constraints
-        MUON_NB_constraints(case, instance, selected_constraints = ['S_NBMIN_DUB_L2'])
-        #- NB Big-M Constraints
-        MUON_NB_BigM_constraints(case, instance, selected_constraints = ['S_NBMIN_CPS','S_NBMIN_MP_NB'])
+        for c in secure_constraints_to_activate:
+            getattr(instance, c).activate()
+
+        #Add MUON Constraints
+        secure_block_constraints_to_activate = ['MUON_MW', 'MUON_NB', 'MUON_NB_BigM']
+        for c in secure_block_constraints_to_activate:
+            getattr(instance, c).activate()
 
         #Update Objective
         instance.del_component(instance.OBJ)
@@ -555,16 +649,12 @@ def model(case: object, solver):
         #Solve Copperplate Model Run
         result["copper_constrained"][iteration] = pyosolve.solveinstance(instance, solver = solver)
 
-        #Define paramter PG_SECURE based on output of model (rounding pG to improve solver function)
-        instance.PG_SECURE = Param(instance.G,
-                                   within = Reals,
-                                   initialize = {g: round(instance.pG[g].value, 6) for g in instance.pG},
-                                   mutable = True)
-        
-        instance.UG_SECURE = Param(instance.G,
-                                  within = Binary,
-                                  initialize = instance.u_g.extract_values(),
-                                  mutable = True)      
+        #Define Output Parameters
+        for g in instance.G:
+            instance.PG_SECURE[g] = round(instance.pG[g].value, 6)
+
+        for g in instance.G:
+            instance.UG_SECURE[g] = round(instance.u_g[g].value, 0)
 
         #Define Data to Save
         data_to_cache = {"Var": [], 
@@ -581,17 +671,23 @@ def model(case: object, solver):
 
         #~~~~~~~~~~~# DCOPF MODEL SECTION #~~~~~~~~~~~#
         #Remove Constraints No Longer Needed
-        constraints_to_remove = [#Generation constraints used in previous models (superceeded by updated PGmax)
+        constraints_to_deactivate_for_dcopf = [#Generation constraints used in previous models (superceeded by updated PGmax)
                                  ComponentName.gen_market_redispatch,
                                  ComponentName.gen_prorata_curtailment_realpower,
                                  
                                  #Remove Copperplate KCL Constraint
                                  ComponentName.KCL_copperplate
                                  ]
-        remove_component_from_instance(instance, constraints_to_remove)
+        
+        for c in constraints_to_deactivate_for_dcopf:
+            getattr(instance, c).deactivate()
 
-        #Add in network constraints
-        build_constraints(instance, [#Power Balance - Kirchoffs Current Law (P
+        #Rebuild constraints with variable set dimensions (Line and Transformers):
+        constraints_to_rebuild = [ComponentName.KVL_DCOPF_lines, ComponentName.KVL_DCOPF_transformer]
+        build_constraints(instance, constraints_to_rebuild)
+
+        #Activate in dcopf constraints
+        dcopf_constraints_to_activate = [#Power Balance - Kirchoffs Current Law (P
                                      ComponentName.KCL_networked_realpower_noshunt,
                                     
                                      #Power Flow - Kirchoffs Voltage Law
@@ -620,14 +716,16 @@ def model(case: object, solver):
                                      ComponentName.gen_prorata_xi_max,
                                      ComponentName.gen_prorata_xi_min,
                                      ComponentName.gen_prorata_beta,
-                                    ])
-        
+                                    ]
+    
+        for c in dcopf_constraints_to_activate:
+            getattr(instance, c).activate()
+
         #Update Objective
         instance.del_component(instance.OBJ)
         instance.OBJ = Objective(rule = redispatch_from_secure_cost_objective(instance), sense = minimize)
 
 
-        #Solve DCOPF Model Run
         result["dcopf_curtailed"][iteration] = pyosolve.solveinstance(instance, solver = solver)
 
         #Define Data to Save
@@ -643,48 +741,24 @@ def model(case: object, solver):
         output["dcopf_curtailed"][iteration].obj_value(instance)
 
         #~~~~~~~~~~~# COPPER PLATE TEST CODE RESET #~~~~~~~~~~~#
-        #remove copper plate secure constraints
-        remove_constraints_list = [#Kirchoffs Current Law
-                                   ComponentName.KCL_networked_realpower_noshunt,
-                                   #Kirchoffs Voltage Law
-                                   ComponentName.KVL_DCOPF_lines,
-                                   ComponentName.KVL_DCOPF_transformer,
-                                   #Power Line Operational Limits
-                                   ComponentName.line_cont_realpower_max_ngtve,
-                                   ComponentName.line_cont_realpower_max_pstve,
-                                   ComponentName.volts_line_delta,
-                                   #Transformer Line Operational Limits
-                                   ComponentName.transf_continuous_real_max_ngtve,
-                                   ComponentName.transf_continuous_real_max_pstve,
-                                   ComponentName.volts_transformer_delta,
-                                   #Reference bus voltage
-                                   ComponentName.volts_reference_bus,
-                                   #MINGEN Generation Constraints
-                                   ComponentName.gen_mingen_redispatch_LB,
-                                   #LIFO Generation Constraints
-                                   ComponentName.gen_LIFO_realpower_max,
-                                   ComponentName.gen_LIFO_realpower_min,
-                                   ComponentName.gen_LIFO_gamma,
-                                   ComponentName.gen_LIFO_beta,
-                                   #Prorata Generation Constraints
-                                   ComponentName.gen_prorata_realpower_max_xi,
-                                   ComponentName.gen_prorata_realpower_min,
-                                   ComponentName.gen_prorata_realpower_min_xi,
-                                   ComponentName.gen_prorata_xi_max,
-                                   ComponentName.gen_prorata_xi_min,
-                                   ComponentName.gen_prorata_beta,
-                                   #Individual Generation Constraints
-                                   ComponentName.gen_individual_realpower_max,
-                                   ComponentName.gen_individual_realpower_min,
-                                   #Uncontrollable Generation Constraints
-                                   ComponentName.gen_uncontrollable_realpower_sp
-                                   ]
-        remove_component_from_instance(instance, remove_constraints_list, skip_missing = True)
+        #list of constraints to deactivate
+        constraints_to_deactivate_to_end_dcopf = [#SNSP Constraint
+                                     'gen_SNSP',
+                                     #KCL Power Balance
+                                     'KCL_networked_realpower_noshunt',
+                                     #KVL Power FLow
+                                     'KVL_DCOPF_lines', 'KVL_DCOPF_transformer', 'line_cont_realpower_max_ngtve', 'line_cont_realpower_max_pstve', 'volts_line_delta', 'transf_continuous_real_max_ngtve', 'transf_continuous_real_max_pstve', 'volts_transformer_delta', 'volts_reference_bus',
+                                     #Redispatch 
+                                     'gen_secure_redispatch',
+                                     #Prorata Curtailment
+                                     'gen_prorata_realpower_max_xi', 'gen_prorata_realpower_min_xi', 'gen_prorata_xi_max', 'gen_prorata_xi_min', 'gen_prorata_beta',
+                                     #MUON Constraint Blocks
+                                    'MUON_MW', 'MUON_NB', 'MUON_NB_BigM']
         
-        #Reapply the first copperplate constraints
-        build_constraints(instance, [ComponentName.gen_forced_individual_realpower_max,
-                                     ComponentName.gen_forced_individual_realpower_min,
-                                     ComponentName.KCL_copperplate])
+        for c in constraints_to_deactivate_to_end_dcopf:
+            getattr(instance, c).deactivate()
+    
+    ...
 
     return output, result
 
