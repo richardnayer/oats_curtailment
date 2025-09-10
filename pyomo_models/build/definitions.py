@@ -516,7 +516,7 @@ class Variables_Blocks:
             ),
 
             #Pro-Rata Curtailment Control Variables
-            ComponentName.prorata_constraint_zeta: VarDef(
+            ComponentName.prorata_curtailment_zeta: VarDef(
                 index=None,
                 domain=NonNegativeReals,
                 bounds=(0, 1),
@@ -697,10 +697,10 @@ class Constraint_Blocks:
                 (0.75/(1-0.75)) * sum(instance.pG[generator] for generator in instance.G_s),
             ),
             # --- Pro-Rata ERG Curtailment (As Defined by Generator Type) ---
-            ComponentName.gen_prorata_constraint_realpower: ConstraintDef(
+            ComponentName.gen_prorata_curtailment_realpower: ConstraintDef(
                 index=ComponentName.G_prorata,
                 rule=lambda instance, generator: instance.pG[generator] == 
-                instance.PG_MARKET[generator] * instance.prorata_constraint_zeta,
+                instance.PG_MARKET[generator] * instance.prorata_curtailment_zeta,
             ),
 
             # --- Pro-Rata ERG Constraint (As Defined by Generator Type) ---

@@ -236,8 +236,8 @@ def MUON_NB_BigM_constraints(case, instance, selected_constraints = None):
     constraint_dict={
             "S_NBMIN_CPS": {
                 #TODO Update limit values to real Ireland system
-                "PDlim": 100/instance.baseMVA,
-                "pGlim": 130/instance.baseMVA,
+                "PDlim": 0/instance.baseMVA,
+                "pGlim": 2000/instance.baseMVA,
                 "Ug_LB": 1,
                 "Ug_UB": None, 
             },
@@ -252,22 +252,23 @@ def MUON_NB_BigM_constraints(case, instance, selected_constraints = None):
 
     if "S_NBMIN_CPS" in selected_constraints:
         #TODO Update limit values to real Ireland system
-        #If demand greater than 160, and wind generation <130, then G3 must be online
+
         #Create Demand Binary Parameter
         if sum(instance.PD[d].value for d in instance.D_NI) >= constraint_dict["S_NBMIN_CPS"]["PDlim"]:
             y_D_CPS = 1
         else:
             y_D_CPS = 0
         instance.bMparam_y_D_CPS = Param(within = Binary, initialize = y_D_CPS)
+        
         #Create variables for generation and overall control
         instance.bMvar_y_G_CPS = Var(domain = Binary)
         instance.bMvar_y_CPS = Var(domain = Binary)
         #Create big-M parameters
-        instance.bMparam_M_G_CPS_U = sum(instance.PGmax[g] for g in instance.G_NI_Wind) - constraint_dict["S_NBMIN_CPS"]["pGlim"]
         instance.bMparam_M_G_CPS_L = constraint_dict["S_NBMIN_CPS"]["pGlim"] - sum(instance.PGmin[g] for g in instance.G_NI_Wind)
+        instance.bMparam_M_G_CPS_U = sum(instance.PGmax[g] for g in instance.G_NI_Wind) - constraint_dict["S_NBMIN_CPS"]["pGlim"]
         #Add constraints
-        instance.bMconst_M_CPS_U = Constraint(rule = constraint_dict["S_NBMIN_CPS"]["pGlim"] - sum(instance.pG[g] for g in instance.G_NI_Wind) <= instance.bMparam_M_G_CPS_U * instance.bMvar_y_G_CPS)
-        instance.bMconst_M_CPS_L = Constraint(rule = sum(instance.pG[g] for g in instance.G_NI_Wind) - constraint_dict["S_NBMIN_CPS"]["pGlim"] <=  instance.bMparam_M_G_CPS_L * (1-instance.bMvar_y_G_CPS))
+        instance.bMconst_M_CPS_L = Constraint(rule = constraint_dict["S_NBMIN_CPS"]["pGlim"] - sum(instance.pG[g] for g in instance.G_NI_Wind) <= instance.bMparam_M_G_CPS_L * instance.bMvar_y_G_CPS)
+        instance.bMconst_M_CPS_U = Constraint(rule = sum(instance.pG[g] for g in instance.G_NI_Wind) - constraint_dict["S_NBMIN_CPS"]["pGlim"] <=  instance.bMparam_M_G_CPS_U * (1-instance.bMvar_y_G_CPS))
         instance.bMconst_y_G_CPS_limit = Constraint(rule = instance.bMvar_y_CPS <= instance.bMvar_y_G_CPS)
         instance.bMconst_y_D_CPS_limit = Constraint(rule = instance.bMvar_y_CPS <= instance.bMparam_y_D_CPS)
         instance.bMconst_y_CPS_limit = Constraint(rule = instance.bMvar_y_CPS >= instance.bMparam_y_D_CPS + instance.bMvar_y_G_CPS - 1)
@@ -283,11 +284,11 @@ def MUON_NB_BigM_constraints(case, instance, selected_constraints = None):
         #Create variables for generation and overall control
         instance.bMvar_y_G_MP_NB = Var(domain = Binary)
         #Create big-M parameters
-        instance.bMparam_M_G_MP_NB_U = sum(instance.PGmax[g] for g in instance.G_ns) - constraint_dict["S_NBMIN_MP_NB"]["pGlim"]
         instance.bMparam_M_G_MP_NB_L = constraint_dict["S_NBMIN_MP_NB"]["pGlim"] - sum(instance.PGmin[g] for g in instance.G_ns)
+        instance.bMparam_M_G_MP_NB_U = sum(instance.PGmax[g] for g in instance.G_ns) - constraint_dict["S_NBMIN_MP_NB"]["pGlim"]
         #Add constraints
-        instance.bMconst_M_MP_NB_U = Constraint(rule = constraint_dict["S_NBMIN_MP_NB"]["pGlim"] - sum(instance.pG[g] for g in instance.G_ns) <= instance.bMparam_M_G_MP_NB_U * instance.bMvar_y_G_MP_NB)
-        instance.bMconst_M_MP_NB_L = Constraint(rule = sum(instance.pG[g] for g in instance.G_ns) - constraint_dict["S_NBMIN_MP_NB"]["pGlim"] <=  instance.bMparam_M_G_MP_NB_L * (1-instance.bMvar_y_G_MP_NB))
+        instance.bMconst_M_MP_NB_L = Constraint(rule = constraint_dict["S_NBMIN_MP_NB"]["pGlim"] - sum(instance.pG[g] for g in instance.G_ns) <= instance.bMparam_M_G_MP_NB_L * instance.bMvar_y_G_MP_NB)
+        instance.bMconst_M_MP_NB_U = Constraint(rule = sum(instance.pG[g] for g in instance.G_ns) - constraint_dict["S_NBMIN_MP_NB"]["pGlim"] <=  instance.bMparam_M_G_MP_NB_U * (1-instance.bMvar_y_G_MP_NB))
         instance.S_NBMIN_MP_NB = Constraint(rule = sum(instance.u_g[g] for g in instance.G_S_NBMIN_MP_NB) >= constraint_dict["S_NBMIN_MP_NB"]["Ug_LB"] * instance.bMvar_y_G_MP_NB)
         print(f"Big-M NB constraint [S_NBMIN_MP_NB] added to instance")
 
@@ -450,6 +451,7 @@ def model(case: object, solver):
         ComponentName.zeta_wind,
         ComponentName.zeta_bin,
         ComponentName.prorata_minimum_zeta,
+        ComponentName.prorata_curtailment_zeta,
         ComponentName.MINGEN_zeta,
         ComponentName.gamma,
         ComponentName.beta,
@@ -531,11 +533,11 @@ def model(case: object, solver):
         #~~~~~~~~~~~# COPPER PLATE 'SECURE' MODEL SECTION #~~~~~~~~~~~#
         
         #Add Pro-Rata Constraint Variables to Model
-        build_variables(instance, [ComponentName.prorata_constraint_zeta])
+        build_variables(instance, [ComponentName.prorata_curtailment_zeta])
 
         #Add constraints for market re-dispatch, pro-rata cosntraint, and SNSP
         build_constraints(instance, [ComponentName.gen_market_redispatch,
-                                     ComponentName.gen_prorata_constraint_realpower,
+                                     ComponentName.gen_prorata_curtailment_realpower,
                                      ComponentName.gen_SNSP])
         
         #Add MUON COnstraints
@@ -544,8 +546,9 @@ def model(case: object, solver):
         #- NB Constraints
         MUON_NB_constraints(case, instance, selected_constraints = ['S_NBMIN_DUB_L2'])
         #- NB Big-M Constraints
-        MUON_NB_BigM_constraints(case, instance, selected_constraints = ['S_NBMIN_CPS', 'S_NBMIN_MP_NB'])
-        
+        MUON_NB_BigM_constraints(case, instance, selected_constraints = ['S_NBMIN_CPS','S_NBMIN_MP_NB'])
+        #'S_NBMIN_CPS'
+
         #Update Objective
         instance.del_component(instance.OBJ)
         instance.OBJ = Objective(rule = redispatch_from_market_cost_objective(instance), sense = minimize)
@@ -580,9 +583,8 @@ def model(case: object, solver):
         #~~~~~~~~~~~# DCOPF MODEL SECTION #~~~~~~~~~~~#
         #Remove Constraints No Longer Needed
         constraints_to_remove = [#Generation constraints used in previous models (superceeded by updated PGmax)
-                                 ComponentName.gen_forced_individual_realpower_min,
-                                 ComponentName.gen_synchronous_individual_realpower_max,
-                                 ComponentName.gen_mingen_redispatch_UB,
+                                 ComponentName.gen_market_redispatch,
+                                 ComponentName.gen_prorata_curtailment_realpower,
                                  
                                  #Remove Copperplate KCL Constraint
                                  ComponentName.KCL_copperplate
