@@ -719,7 +719,7 @@ class Constraint_Blocks:
             ComponentName.gen_prorata_realpower_min_xi: ConstraintDef(
                 index=ComponentName.G_prorata,
                 rule=lambda instance, generator: instance.pG[generator]
-                >= instance.PGmax[generator] * instance.xi_prorata[generator],
+                >= instance.PG_SECURE[generator] * instance.xi_prorata[generator],
             ),
             #Constraint that ensures the 'zeta' operator for each generator, is less than or equal to the
             #'zeta' operator of all the constraint groups (cg) to which the generator belongs. \n

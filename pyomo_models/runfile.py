@@ -9,6 +9,7 @@ import data_io.load_case as load_case
 import pyomo_models.models.dcopf_snapshot as dcopf_snapshot
 import pyomo_models.models.dcopf_iterations as dcopf_iterations
 import pyomo_models.models.all_island_iterations_PSCC as all_island_iterations
+import data_io.pyomo_print as print_data
 
 # Set up logger
 import logging
@@ -46,6 +47,7 @@ def run_model(testcase = "end-to-end-testcase.xlsx", solver = "appsi_highs", mod
             case._load_excel_case("end-to-end-testcase.xlsx", iterative = True)
             case.summary()
             output, result = all_island_iterations.model(case, solver)
+            print_data.all_island_timeseries_to_excel(case, output)
             return output, result
 
         case _:
@@ -53,5 +55,5 @@ def run_model(testcase = "end-to-end-testcase.xlsx", solver = "appsi_highs", mod
         
 
 output, result = run_model(model = "All Island Timeseries")
-...
+
 

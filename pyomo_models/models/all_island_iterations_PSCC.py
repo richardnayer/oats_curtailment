@@ -692,7 +692,7 @@ def model(case: object, solver):
                                      #Reference bus voltage
                                      ComponentName.volts_reference_bus,
 
-                                     #Redispatch COnstraint
+                                     #Redispatch Constraint
                                      ComponentName.gen_secure_redispatch,
 
                                      #Pro-Rata Constraint Group Constraints
@@ -711,7 +711,7 @@ def model(case: object, solver):
         instance.OBJ = Objective(rule = redispatch_from_secure_cost_objective(instance), sense = minimize)
 
 
-        result[iteration]["dcopf_curtailed"] = pyosolve.solveinstance(instance, solver = solver)
+        result[iteration]["dcopf"] = pyosolve.solveinstance(instance, solver = solver)
 
         #Define Data to Save
         data_to_cache = {"Var": [], 
@@ -719,11 +719,11 @@ def model(case: object, solver):
                     "Set" : []}
         
         #Cache Data
-        output[iteration]["dcopf_curtailed"] = pyomo_io.InstanceCache(result[iteration]["dcopf_curtailed"], data_to_cache)
-        output[iteration]["dcopf_curtailed"].set(instance)
-        output[iteration]["dcopf_curtailed"].var(instance)
-        output[iteration]["dcopf_curtailed"].param(instance)
-        output[iteration]["dcopf_curtailed"].obj_value(instance)
+        output[iteration]["dcopf"] = pyomo_io.InstanceCache(result[iteration]["dcopf"], data_to_cache)
+        output[iteration]["dcopf"].set(instance)
+        output[iteration]["dcopf"].var(instance)
+        output[iteration]["dcopf"].param(instance)
+        output[iteration]["dcopf"].obj_value(instance)
 
         #~~~~~~~~~~~# COPPER PLATE TEST CODE RESET #~~~~~~~~~~~#
         #list of constraints to deactivate
@@ -745,19 +745,28 @@ def model(case: object, solver):
     
         #~~~~~~~~~~~# CALCULATE CURTAILMENT AND CONSTRAINT VOLUMES #~~~~~~~~~~~#
         #Calculate overall surplus volumes, and surplus per generator
-        output[iteration]['V_Surplus'] = sum((instance.PGmax[g].value - instance.PG_MARKET[g].value) for g in instance.G_ns)
-        output[iteration]['v_Surplus_g'] = {g: (instance.PGmax[g].value - instance.PG_MARKET[g].value) for g in instance.G_ns}
+        setattr(output[iteration]["dcopf"], 'V_Surplus', sum((instance.PGmax[g].value - instance.PG_MARKET[g].value) for g in instance.G_ns))
+        setattr(output[iteration]["dcopf"], 'v_Surplus_g', {g: (instance.PGmax[g].value - instance.PG_MARKET[g].value) for g in instance.G_ns})
+        output[iteration]["dcopf"].v_Surplus_g.update({g: 0 for g in instance.G_s})
+        
 
         #Calculate overall SNSP volume. Then divide by non-synchronous generators pro-rata.
-        output[iteration]['V_SNSP'] = max(0, sum(instance.PG_MARKET[g].value for g in instance.G_ns) - 0.75*sum(instance.PG_MARKET[g].value for g in instance.G))
-        output[iteration]['x_SNSP'] = max(0, sum(instance.PG_MARKET[g].value for g in instance.G_ns)/sum(instance.PG_MARKET[g].value for g in instance.G) - 0.75)
-        output[iteration]['v_SNSP_g'] = {g: (instance.PG_MARKET[g].value * output[iteration]['x_SNSP']) for g in instance.G_ns}
+        setattr(output[iteration]["dcopf"], 'V_SNSP', max(0, sum(instance.PG_MARKET[g].value for g in instance.G_ns) - 0.75*sum(instance.PG_MARKET[g].value for g in instance.G)))
+        setattr(output[iteration]["dcopf"], 'x_SNSP', max(0, sum(instance.PG_MARKET[g].value for g in instance.G_ns)/sum(instance.PG_MARKET[g].value for g in instance.G) - 0.75))
+        setattr(output[iteration]["dcopf"], 'v_SNSP_g', {g: (instance.PG_MARKET[g].value * output[iteration]["dcopf"].x_SNSP) for g in instance.G_ns})
+        output[iteration]["dcopf"].v_SNSP_g.update({g: 0 for g in instance.G_s})
 
         #Calculate overall MUON volume. Then divide by non-synchronous generators pro-rata
-        output[iteration]['V_MUON'] = sum((instance.PG_MARKET[g].value - instance.PG_SECURE[g].value) for g in instance.G_ns) - output[iteration]['V_SNSP']
-        output[iteration]['x_MUON'] = output[iteration]['V_MUON'] / sum(instance.PG_MARKET[g].value for g in instance.G_ns)
-        output[iteration]['v_MUON_g'] = {g: (instance.PG_MARKET[g].value * output[iteration]['x_MUON']) for g in instance.G_ns}
-        
+        setattr(output[iteration]["dcopf"], 'V_MUON', sum((instance.PG_MARKET[g].value - instance.PG_SECURE[g].value) for g in instance.G_ns) - output[iteration]["dcopf"].V_SNSP)
+        setattr(output[iteration]["dcopf"], 'x_MUON', output[iteration]["dcopf"].V_MUON / sum(instance.PG_MARKET[g].value for g in instance.G_ns))
+        setattr(output[iteration]["dcopf"], 'v_MUON_g', {g: (instance.PG_MARKET[g].value * output[iteration]["dcopf"].x_MUON) for g in instance.G_ns})
+        output[iteration]["dcopf"].v_MUON_g.update({g: 0 for g in instance.G_s})
+
+        #Calculate overall constraint volume.
+        setattr(output[iteration]["dcopf"],'V_Constraint', sum((instance.PG_SECURE[g].value - instance.pG[g].value) for g in instance.G_ns))
+        setattr(output[iteration]["dcopf"],'x_Constraint',{g: (instance.PG_SECURE[g].value - instance.pG[g].value)/instance.PG_SECURE[g].value if instance.PG_SECURE[g].value > 0 else 0 for g in instance.G_ns})
+        setattr(output[iteration]["dcopf"], 'v_Constraint_g',{g: (instance.PG_SECURE[g].value - instance.pG[g].value) for g in instance.G_ns})
+        output[iteration]["dcopf"].v_Constraint_g.update({g: 0 for g in instance.G_s})
         ...
 
 
