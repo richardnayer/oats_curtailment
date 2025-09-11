@@ -308,20 +308,9 @@ def model(case: object, solver):
     instance = model.create_instance()
     #instance.dual = Suffix(direction=Suffix.IMPORT)
 
-    #Define Data Outputs
-    output = {
-        "format": "iteration",
-        "copper_market": {},
-        "copper_curtailed": {},
-        "dcopf_curtailed": {}
-    }
-
-    result = {
-        "format": "iteration",
-        "copper_market": {},
-        "copper_curtailed": {},
-        "dcopf_curtailed": {}
-    }
+    #Create Data Ouput & Result Dictionaries
+    output = {"format": "iteration"}
+    result = {"format": "iteration"}
 
     #Define list of sets for model and add to model
     setlist = [
@@ -571,6 +560,10 @@ def model(case: object, solver):
 
     #MODEL ITERATIONS
     for iteration in case.iterations:
+        #Create new output & result dictionary space
+        output[iteration] = {}
+        result[iteration] = {}
+
         #Update parameters for current timestep
         add_iteration_params_to_instance(instance, case, ts_params, iteration)
 
@@ -595,7 +588,7 @@ def model(case: object, solver):
         instance.OBJ = Objective(rule = copper_plate_marginal_cost_objective(instance), sense = minimize)
 
         #Solve Copperplate Model Run
-        result["copper_market"][iteration] = pyosolve.solveinstance(instance, solver = solver)
+        result[iteration]["copper_market"] = pyosolve.solveinstance(instance, solver = solver)
 
         #Define Output Parameters
         for g in instance.G:
@@ -610,11 +603,11 @@ def model(case: object, solver):
                     "Set" : []}
         
         #Cache Data
-        output["copper_market"][iteration] = pyomo_io.InstanceCache(result["copper_market"][iteration], data_to_cache)
-        output["copper_market"][iteration].set(instance)
-        output["copper_market"][iteration].var(instance)
-        output["copper_market"][iteration].param(instance)
-        output["copper_market"][iteration].obj_value(instance)
+        output[iteration]["copper_market"] = pyomo_io.InstanceCache(result[iteration]["copper_market"], data_to_cache)
+        output[iteration]["copper_market"].set(instance)
+        output[iteration]["copper_market"].var(instance)
+        output[iteration]["copper_market"].param(instance)
+        output[iteration]["copper_market"].obj_value(instance)
 
         #~~~~~~~~~~~# COPPER PLATE 'SECURE' MODEL SECTION #~~~~~~~~~~~#
         #Add Constraints (Except MUON Constraints)
@@ -639,7 +632,7 @@ def model(case: object, solver):
         instance.OBJ = Objective(rule = redispatch_from_market_cost_objective(instance), sense = minimize)
                         
         #Solve Copperplate Model Run
-        result["copper_curtailed"][iteration] = pyosolve.solveinstance(instance, solver = solver)
+        result[iteration]["copper_curtailed"] = pyosolve.solveinstance(instance, solver = solver)
 
         #Define Output Parameters
         for g in instance.G:
@@ -654,11 +647,11 @@ def model(case: object, solver):
                     "Set" : []}
         
         #Cache Data
-        output["copper_curtailed"][iteration] = pyomo_io.InstanceCache(result["copper_curtailed"][iteration], data_to_cache)
-        output["copper_curtailed"][iteration].set(instance)
-        output["copper_curtailed"][iteration].var(instance)
-        output["copper_curtailed"][iteration].param(instance)
-        output["copper_curtailed"][iteration].obj_value(instance)
+        output[iteration]["copper_curtailed"] = pyomo_io.InstanceCache(result[iteration]["copper_curtailed"], data_to_cache)
+        output[iteration]["copper_curtailed"].set(instance)
+        output[iteration]["copper_curtailed"].var(instance)
+        output[iteration]["copper_curtailed"].param(instance)
+        output[iteration]["copper_curtailed"].obj_value(instance)
 
 
         #~~~~~~~~~~~# DCOPF MODEL SECTION #~~~~~~~~~~~#
@@ -718,7 +711,7 @@ def model(case: object, solver):
         instance.OBJ = Objective(rule = redispatch_from_secure_cost_objective(instance), sense = minimize)
 
 
-        result["dcopf_curtailed"][iteration] = pyosolve.solveinstance(instance, solver = solver)
+        result[iteration]["dcopf_curtailed"] = pyosolve.solveinstance(instance, solver = solver)
 
         #Define Data to Save
         data_to_cache = {"Var": [], 
@@ -726,11 +719,11 @@ def model(case: object, solver):
                     "Set" : []}
         
         #Cache Data
-        output["dcopf_curtailed"][iteration] = pyomo_io.InstanceCache(result["dcopf_curtailed"][iteration], data_to_cache)
-        output["dcopf_curtailed"][iteration].set(instance)
-        output["dcopf_curtailed"][iteration].var(instance)
-        output["dcopf_curtailed"][iteration].param(instance)
-        output["dcopf_curtailed"][iteration].obj_value(instance)
+        output[iteration]["dcopf_curtailed"] = pyomo_io.InstanceCache(result[iteration]["dcopf_curtailed"], data_to_cache)
+        output[iteration]["dcopf_curtailed"].set(instance)
+        output[iteration]["dcopf_curtailed"].var(instance)
+        output[iteration]["dcopf_curtailed"].param(instance)
+        output[iteration]["dcopf_curtailed"].obj_value(instance)
 
         #~~~~~~~~~~~# COPPER PLATE TEST CODE RESET #~~~~~~~~~~~#
         #list of constraints to deactivate
@@ -752,18 +745,18 @@ def model(case: object, solver):
     
         #~~~~~~~~~~~# CALCULATE CURTAILMENT AND CONSTRAINT VOLUMES #~~~~~~~~~~~#
         #Calculate overall surplus volumes, and surplus per generator
-        output['V_Surplus'] = sum((instance.PGmax[g].value - instance.PG_MARKET[g].value) for g in instance.G_ns)
-        output['v_Surplus_g'] = {g: (instance.PGmax[g].value - instance.PG_MARKET[g].value) for g in instance.G_ns}
+        output[iteration]['V_Surplus'] = sum((instance.PGmax[g].value - instance.PG_MARKET[g].value) for g in instance.G_ns)
+        output[iteration]['v_Surplus_g'] = {g: (instance.PGmax[g].value - instance.PG_MARKET[g].value) for g in instance.G_ns}
 
         #Calculate overall SNSP volume. Then divide by non-synchronous generators pro-rata.
-        output['V_SNSP'] = max(0, sum(instance.PG_MARKET[g].value for g in instance.G_ns) - 0.75*sum(instance.PG_MARKET[g].value for g in instance.G))
-        output['x_SNSP'] = max(0, sum(instance.PG_MARKET[g].value for g in instance.G_ns)/sum(instance.PG_MARKET[g].value for g in instance.G) - 0.75)
-        output['v_SNSP_g'] = {g: (instance.PG_MARKET[g].value * output['x_SNSP']) for g in instance.G_ns}
+        output[iteration]['V_SNSP'] = max(0, sum(instance.PG_MARKET[g].value for g in instance.G_ns) - 0.75*sum(instance.PG_MARKET[g].value for g in instance.G))
+        output[iteration]['x_SNSP'] = max(0, sum(instance.PG_MARKET[g].value for g in instance.G_ns)/sum(instance.PG_MARKET[g].value for g in instance.G) - 0.75)
+        output[iteration]['v_SNSP_g'] = {g: (instance.PG_MARKET[g].value * output[iteration]['x_SNSP']) for g in instance.G_ns}
 
         #Calculate overall MUON volume. Then divide by non-synchronous generators pro-rata
-        output['V_MUON'] = sum((instance.PG_MARKET[g].value - instance.PG_SECURE[g].value) for g in instance.G_ns) - output['V_SNSP']
-        output['x_MUON'] = output['V_MUON'] / sum(instance.PG_MARKET[g].value for g in instance.G_ns)
-        output['v_MUON_g'] = {g: (instance.PG_MARKET[g].value * output['x_MUON']) for g in instance.G_ns}
+        output[iteration]['V_MUON'] = sum((instance.PG_MARKET[g].value - instance.PG_SECURE[g].value) for g in instance.G_ns) - output[iteration]['V_SNSP']
+        output[iteration]['x_MUON'] = output[iteration]['V_MUON'] / sum(instance.PG_MARKET[g].value for g in instance.G_ns)
+        output[iteration]['v_MUON_g'] = {g: (instance.PG_MARKET[g].value * output[iteration]['x_MUON']) for g in instance.G_ns}
         
         ...
 
