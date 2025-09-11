@@ -312,14 +312,14 @@ def model(case: object, solver):
     output = {
         "format": "iteration",
         "copper_market": {},
-        "copper_constrained": {},
+        "copper_curtailed": {},
         "dcopf_curtailed": {}
     }
 
     result = {
         "format": "iteration",
         "copper_market": {},
-        "copper_constrained": {},
+        "copper_curtailed": {},
         "dcopf_curtailed": {}
     }
 
@@ -530,27 +530,21 @@ def model(case: object, solver):
     #DCOPF MODEL CONSTRAINTS #
     dcopf_constraints = [#Power Balance - Kirchoffs Current Law (P
                         ComponentName.KCL_networked_realpower_noshunt,
-                    
                         #Power Flow - Kirchoffs Voltage Law
                         ComponentName.KVL_DCOPF_lines,
                         ComponentName.KVL_DCOPF_transformer,
-                    
                         #Power Flow - Power Line Operational Limits
                         ComponentName.line_cont_realpower_max_ngtve,
                         ComponentName.line_cont_realpower_max_pstve,
                         ComponentName.volts_line_delta,
-
                         #Power Flow - Transformer Line Operational Limits
                         ComponentName.transf_continuous_real_max_ngtve,
                         ComponentName.transf_continuous_real_max_pstve,
                         ComponentName.volts_transformer_delta,
-
                         #Reference bus voltage
                         ComponentName.volts_reference_bus,
-
                         #Redispatch COnstraint
                         ComponentName.gen_secure_redispatch,
-
                         #Pro-Rata Constraint Group Constraints
                         ComponentName.gen_prorata_realpower_max_xi,
                         ComponentName.gen_prorata_realpower_min_xi,
@@ -563,10 +557,8 @@ def model(case: object, solver):
     #Deactivate all constraints ready for iteration
     global_constraints = ['KCL_copperplate', 'demand_real_alpha_controlled', 'demand_alpha_max', 'demand_alpha_fixneg', 'gen_uc_max', 'gen_uc_min', 'gen_market_redispatch', 'gen_prorata_curtailment_realpower', 'gen_SNSP', 'KCL_networked_realpower_noshunt', 'KVL_DCOPF_lines', 'KVL_DCOPF_transformer', 'line_cont_realpower_max_ngtve', 'line_cont_realpower_max_pstve', 'volts_line_delta', 'transf_continuous_real_max_ngtve', 'transf_continuous_real_max_pstve', 'volts_transformer_delta', 'volts_reference_bus', 'gen_secure_redispatch', 'gen_prorata_realpower_max_xi', 'gen_prorata_realpower_min_xi', 'gen_prorata_xi_max', 'gen_prorata_xi_min', 'gen_prorata_beta']
     block_constraints =  ['MUON_MW', 'MUON_NB', 'MUON_NB_BigM']
-
     for c in global_constraints:
         getattr(instance, c).deactivate()
-
     for block in block_constraints:
         getattr(instance, block).deactivate()
 
@@ -647,7 +639,7 @@ def model(case: object, solver):
         instance.OBJ = Objective(rule = redispatch_from_market_cost_objective(instance), sense = minimize)
                         
         #Solve Copperplate Model Run
-        result["copper_constrained"][iteration] = pyosolve.solveinstance(instance, solver = solver)
+        result["copper_curtailed"][iteration] = pyosolve.solveinstance(instance, solver = solver)
 
         #Define Output Parameters
         for g in instance.G:
@@ -662,11 +654,11 @@ def model(case: object, solver):
                     "Set" : []}
         
         #Cache Data
-        output["copper_constrained"][iteration] = pyomo_io.InstanceCache(result["copper_constrained"][iteration], data_to_cache)
-        output["copper_constrained"][iteration].set(instance)
-        output["copper_constrained"][iteration].var(instance)
-        output["copper_constrained"][iteration].param(instance)
-        output["copper_constrained"][iteration].obj_value(instance)
+        output["copper_curtailed"][iteration] = pyomo_io.InstanceCache(result["copper_curtailed"][iteration], data_to_cache)
+        output["copper_curtailed"][iteration].set(instance)
+        output["copper_curtailed"][iteration].var(instance)
+        output["copper_curtailed"][iteration].param(instance)
+        output["copper_curtailed"][iteration].obj_value(instance)
 
 
         #~~~~~~~~~~~# DCOPF MODEL SECTION #~~~~~~~~~~~#
@@ -734,7 +726,7 @@ def model(case: object, solver):
                     "Set" : []}
         
         #Cache Data
-        output["dcopf_curtailed"][iteration] = pyomo_io.InstanceCache(result["copper_constrained"][iteration], data_to_cache)
+        output["dcopf_curtailed"][iteration] = pyomo_io.InstanceCache(result["dcopf_curtailed"][iteration], data_to_cache)
         output["dcopf_curtailed"][iteration].set(instance)
         output["dcopf_curtailed"][iteration].var(instance)
         output["dcopf_curtailed"][iteration].param(instance)
@@ -758,7 +750,23 @@ def model(case: object, solver):
         for c in constraints_to_deactivate_to_end_dcopf:
             getattr(instance, c).deactivate()
     
-    ...
+        #~~~~~~~~~~~# CALCULATE CURTAILMENT AND CONSTRAINT VOLUMES #~~~~~~~~~~~#
+        #Calculate overall surplus volumes, and surplus per generator
+        output['V_Surplus'] = sum((instance.PGmax[g].value - instance.PG_MARKET[g].value) for g in instance.G_ns)
+        output['v_Surplus_g'] = {g: (instance.PGmax[g].value - instance.PG_MARKET[g].value) for g in instance.G_ns}
+
+        #Calculate overall SNSP volume. Then divide by non-synchronous generators pro-rata.
+        output['V_SNSP'] = max(0, sum(instance.PG_MARKET[g].value for g in instance.G_ns) - 0.75*sum(instance.PG_MARKET[g].value for g in instance.G))
+        output['x_SNSP'] = max(0, sum(instance.PG_MARKET[g].value for g in instance.G_ns)/sum(instance.PG_MARKET[g].value for g in instance.G) - 0.75)
+        output['v_SNSP_g'] = {g: (instance.PG_MARKET[g].value * output['x_SNSP']) for g in instance.G_ns}
+
+        #Calculate overall MUON volume. Then divide by non-synchronous generators pro-rata
+        output['V_MUON'] = sum((instance.PG_MARKET[g].value - instance.PG_SECURE[g].value) for g in instance.G_ns) - output['V_SNSP']
+        output['x_MUON'] = output['V_MUON'] / sum(instance.PG_MARKET[g].value for g in instance.G_ns)
+        output['v_MUON_g'] = {g: (instance.PG_MARKET[g].value * output['x_MUON']) for g in instance.G_ns}
+        
+        ...
+
 
     return output, result
 
