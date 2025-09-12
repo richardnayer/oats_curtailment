@@ -20,14 +20,14 @@ formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(message)s")
 handler.setFormatter(formatter)
 logger.addHandler(handler)
 
-def run_model(testcase = "end-to-end-testcase.xlsx", solver = "appsi_highs", model="DCOPF"):
+def run_model(testcase = "illustrative_testcase.xlsx", solver = "appsi_highs", model="DCOPF"):
 
 
     match model:
         case 'DCOPF Snapshot':
             #load case
             case = load_case.Case()
-            case._load_excel_case("end-to-end-testcase.xlsx")
+            case._load_excel_case(testcase)
             case.summary()
             #run model
             output, result = dcopf_snapshot.model(case, solver)
@@ -36,7 +36,7 @@ def run_model(testcase = "end-to-end-testcase.xlsx", solver = "appsi_highs", mod
         case 'DCOPF Timeseries':
             #load case
             case = load_case.Case()
-            case._load_excel_case("end-to-end-testcase.xlsx", iterative = True)
+            case._load_excel_case(testcase, iterative = True)
             case.summary()
             output, result = dcopf_iterations.model(case, solver)
             return output, result
@@ -44,7 +44,7 @@ def run_model(testcase = "end-to-end-testcase.xlsx", solver = "appsi_highs", mod
         case 'All Island Timeseries':
             #load case
             case = load_case.Case()
-            case._load_excel_case("end-to-end-testcase.xlsx", iterative = True)
+            case._load_excel_case(testcase, iterative = True)
             case.summary()
             output, result = all_island_iterations.model(case, solver)
             print_data.all_island_timeseries_to_excel(case, output)

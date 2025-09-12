@@ -19,7 +19,7 @@ def solveinstance(instance, solver='appsi_highs'):
     opt = SolverFactory(solver)
     
     try:
-        result = opt.solve(instance, tee=True, warmstart=False)
+        result = opt.solve(instance, tee=False, warmstart=True)
         return result
     except RuntimeError as exc:
         log_infeasible_constraints(instance, logger=logger, log_expression=True, log_variables=True)

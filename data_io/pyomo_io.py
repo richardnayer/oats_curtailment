@@ -34,7 +34,7 @@ class InstanceCache:
             return        
         if not self.data_to_cache["Param"]:
             # print("not none 2")
-            param_list = instance.component_objects(Param, active=True)
+            param_list = instance.component_objects(Param, active=None, descend_into=True)
         else:
             # print("not none 3")
             param_list = self.data_to_cache["Param"]
@@ -45,8 +45,10 @@ class InstanceCache:
             # print(paramobject)
             
             # Use a generator to assign index-value pairs directly to the attribute
-            setattr(self, str(p), {index: paramobject[index].value if "pyomo" in str(type(paramobject[index])) else paramobject[index]
-                                    for index in paramobject})
+            if paramobject.is_indexed() == True:
+                setattr(self, str(p), paramobject.extract_values())
+            else:
+                setattr(self, str(p), paramobject.value)
     
     #Add Variables to Object
     def var(self, instance):
@@ -57,18 +59,19 @@ class InstanceCache:
         if self.data_to_cache["Var"] == [None]:
             return
         if not self.data_to_cache["Var"]:
-            var_list = instance.component_objects(Var, active=True)
+            var_list = instance.component_objects(Var, active=None, descend_into=True)
         else:
             var_list = self.data_to_cache["Var"]
 
         #Iterator through all variables in var_list, extract value and add to object
         for v in var_list:
             varobject = InstanceCache._rgetattr(instance, str(v))
-            # print(str(v), {index: varobject[index].value if "pyomo" in str(type(varobject[index])) else varobject[index]
-            #                        for index in varobject})
+
             # Use a generator to assign index-value pairs directly to the attribute
-            setattr(self, str(v), {index: varobject[index].value if "pyomo" in str(type(varobject[index])) else varobject[index]
-                                   for index in varobject})
+            if varobject.is_indexed() == True:
+                setattr(self, str(v), varobject.extract_values())
+            else:
+                setattr(self, str(v), varobject.value)
             
                
     #Add Sets to Object
@@ -80,7 +83,7 @@ class InstanceCache:
         if self.data_to_cache["Set"] == [None]:
             return       
         if not self.data_to_cache["Set"]:
-            set_list = instance.component_objects(Set, active=True)
+            set_list = instance.component_objects(Set, active=None, descend_into=True)
         else:
             set_list = self.data_to_cache["Set"]
 

@@ -19,8 +19,10 @@ handler.setFormatter(formatter)
 logger.addHandler(handler)
 
 
-def MUON_MW_constraints(case, instance, selected_constraints = None):
 
+#=============# FUNCTION FOR MUON CONSTRAINTS ==================#
+
+def MUON_constraints(case, instance, constraint_dict, selected_constraints = None):
     #Define handling of default cosntraints to activate
     if selected_constraints == None:
         print("No MUON_MW Constraints Defined")
@@ -37,42 +39,6 @@ def MUON_MW_constraints(case, instance, selected_constraints = None):
     if len(empty_constraint_sets) > 0:
         raise KeyError(f"No generator sets are defined for the followin MUON NB constraints in the case xls: {empty_constraint_sets} ")
 
-    #Dictionary of constraints & bounds
-    constraint_dict={
-        "S_MWMAX_NI_GT": {
-            "PG_LB": None,
-            "PG_UB": 272/instance.baseMVA 
-        },
-        "S_MWMIN_EWIC": {
-            "PG_LB": -526/instance.baseMVA ,
-            "PG_UB": None 
-        },
-        "S_MWMAX_EWIC": {
-            "PG_LB": None,
-            "PG_UB": 504/instance.baseMVA  
-        },
-        "S_MWMIN_MOYLE": {
-            "PG_LB": -410/instance.baseMVA ,
-            "PG_UB": None
-        },
-        "S_MWAX_MOYLE": {
-            "PG_LB": None,
-            "PG_UB": 441/instance.baseMVA   
-        },
-        "S_REP_ROI": {
-            "PG_LB": None,
-            "PG_UB": lambda: sum(instance.PGmax[g] for g in instance.G_S_REP_ROI) - 80/instance.baseMVA 
-        },
-        "S_MWMAX_CRK_MW": {
-            "PG_LB": None,
-            "PG_UB": 1370/instance.baseMVA  
-        },
-        "S_MWMAX_STH_MW": {
-            "PG_LB": None,
-            "PG_UB": 1835/instance.baseMVA  
-        },
-    }
-
     #Add sets of generator to model if (a) they're selected, and (b) they have been defined in the case
     added_sets = []
     for constraint in selected_constraints:
@@ -81,137 +47,67 @@ def MUON_MW_constraints(case, instance, selected_constraints = None):
                                 dimen = 1)
         instance.add_component('G_'+constraint, constraint_set)
         added_sets += [constraint]
-    print(f"Sets for the following MW contraints have been added to the model \n {added_sets}")
-           
-    #Add Constraints into Model
-    instance.MUON_MW = Block()
+    print(f"Sets for the following MUON contraints have been added to the model \n {added_sets}")
 
+    #Create Overall MUON Constrain Block if it doesn't already exist
+    if hasattr(instance, "MUON") == False:
+        setattr(instance, "MUON", Block())
+    #Create helper variable
+    MUON_block = getattr(instance, "MUON")
+
+    
     added_constraints = []
     for constraint in selected_constraints:
-        #Apply LB constraint (checks if callable function for bounds with a formula)
-        if constraint_dict.get(constraint).get('PG_LB') is not None:
-            if callable(constraint_dict.get(constraint).get('PG_LB')) == False:
-                instance.MUON_MW.add_component(constraint+'_LB', Constraint(rule = sum(instance.pG[g] for g in getattr(instance, 'G_'+constraint)) >= constraint_dict.get(constraint).get('PG_LB')))
-            else:
-                instance.MUON_MW.add_component(constraint+'_LB', Constraint(rule = sum(instance.pG[g] for g in getattr(instance, 'G_'+constraint)) >= constraint_dict.get(constraint).get('PG_LB')()))
-            added_constraints += [constraint+'_LB']
-        #Apply UB constraint (checks if callable function for bounds with a formula)
-        if constraint_dict.get(constraint).get('PG_UB') is not None:
-            if callable(constraint_dict.get(constraint).get('PG_UB')) == False:
-                instance.MUON_MW.add_component(constraint+'_UB', Constraint(rule = sum(instance.pG[g] for g in getattr(instance, 'G_'+constraint)) <= constraint_dict.get(constraint).get('PG_UB')))
-            else:
-                instance.MUON_MW.add_component(constraint+'_UB', Constraint(rule = sum(instance.pG[g] for g in getattr(instance, 'G_'+constraint)) <= constraint_dict.get(constraint).get('PG_UB')()))
-            added_constraints += [constraint+'_UB']
+        #Define helper variables
+        constraint_def = constraint_dict.get(constraint)
+        constraint_type = constraint_def.get("type")
+        MUON_type_bound_map = {"MW": {"UB": "PG_UB", "LB": "PG_LB"}, "NB": {"UB": "Ug_UB", "LB": "Ug_LB"}}
+        LB_name = MUON_type_bound_map.get(constraint_def.get("type")).get("LB")
+        UB_name = MUON_type_bound_map.get(constraint_def.get("type")).get("UB")
+        LB = constraint_def.get(LB_name)
+        UB = constraint_def.get(UB_name)
 
+        #Define variable to be cosntrained based on type
+        if constraint_type == "NB":
+            constraint_var = "u_g"
+        elif constraint_type == "MW":
+            constraint_var = "pG"
 
-    print(f"The following MW constraints have been added to the model \n {added_constraints}")
-    ...
-
-def MUON_NB_constraints(case, instance, selected_constraints = None):
-
-    #Define handling of default constraints to activate
-    if selected_constraints == None:
-        print("No MUON_NB Constraints Defined")
-        return
         
-    #Create dictionary of MUON constraint groups defined within the case
-    constraints_in_case_dict = helpers.comma_param_as_index_to_dict(case, 'generators', 'name', 'MUON_group')
+        #Create sub_block within instance.MUON for the constraint to contain UB and LB constraints
+        setattr(MUON_block, constraint, Block())
+        constraint_block = getattr(MUON_block, constraint)
 
-    #Check if sets have been defined in case, and raise error if not.
-    empty_constraint_sets = []
-    for constraint in selected_constraints:
-        if constraint not in constraints_in_case_dict.keys():
-            empty_constraint_sets += [constraint]
-    if len(empty_constraint_sets) > 0:
-        raise KeyError(f"No generator sets are defined for the followin MUON NB constraints in the case xls: {empty_constraint_sets} ")
-    
+        #Create constraints for upper and lower bounds as required
+        for bound, suffix in [[LB, '_LB'], [UB, '_UB']]:
+            if bound is not None:
+                if callable(bound) == False:
+                    if suffix == '_LB':
+                        constraint_block.add_component(suffix,
+                                                       Constraint(rule = sum(getattr(instance, constraint_var)[g] 
+                                                                             for g in getattr(instance, 'G_'+constraint))
+                                                                             >= bound))
+                    if suffix == '_UB':
+                        constraint_block.add_component(suffix,
+                                                       Constraint(rule = sum(getattr(instance, constraint_var)[g] 
+                                                                             for g in getattr(instance, 'G_'+constraint))
+                                                                             <= bound))
+                else:                  
+                    if suffix == '_LB':
+                        constraint_block.add_component(suffix,
+                                                       Constraint(rule = sum(getattr(instance, constraint_var)[g] 
+                                                                             for g in getattr(instance, 'G_'+constraint))
+                                                                             >= bound()))
+                    if suffix == '_UB':
+                        constraint_block.add_component(suffix,
+                                                       Constraint(rule = sum(getattr(instance, constraint_var)[g] 
+                                                                             for g in getattr(instance, 'G_'+constraint))
+                                                                             <= bound()))
+            ...
+    added_constraints += [constraint]
+    print(f"The following MUON constraints have been added to the model \n {added_constraints}")
 
-    #Dictionary of constraints & bounds
-    constraint_dict={
-        "S_NBMIN_MINNIU": {
-            "Condition": None,
-            "Ug_LB": 3,
-            "Ug_UB": None 
-        },
-        "S_NBMIN_MINNI3": {
-            "Condition": None,
-            "Ug_LB": 1,
-            "Ug_UB": None 
-        },
-        "S_NBMIN_ROImin": {
-            "Condition": None,
-            "Ug_LB": 4,
-            "Ug_UB": None 
-        },
-        "S_NBMIN_DubNB": {
-            "Condition": None,
-            "Ug_LB": 1,
-            "Ug_UB": None 
-        },
-        "S_NBMIN_DubNB2": {
-            "Condition": None,
-            "Ug_LB": 2,
-            "Ug_UB": None 
-        },
-        "S_NBMIN_DUB_L1": {
-            "Condition": lambda: sum(instance.PD[d].value for d in instance.D_ROI) >= 4000/instance.baseMVA,
-            "Ug_LB": 3,
-            "Ug_UB": None 
-        },
-        "S_NBMIN_DUB_L2": {
-            "Condition": lambda: sum(instance.PD[d].value for d in instance.D_ROI) >= 0/instance.baseMVA,
-            "Ug_LB": 1,
-            "Ug_UB": None 
-        },
-        "MP5_NB": {
-            "Ug_LB": None,
-            "Ug_UB": 1 
-        },
-    }
-
-    #Add sets of generator to model if (a) they're selected, and (b) they have been defined in the case
-    added_sets = []
-    for constraint in selected_constraints:
-        constraint_set = Set(within = instance.G,
-                                initialize = constraints_in_case_dict[constraint],
-                                dimen = 1)
-        instance.add_component('G_'+constraint, constraint_set)
-        added_sets += [constraint]
-    print(f"The following NB contraint sets have been added to the model \n {added_sets}")
-    
-
-    #Add Constraints to Model
-    instance.MUON_NB = Block()
-
-    added_constraints = []
-    for constraint in selected_constraints:
-        #Check if a condition applies to constraint. if it does and isn't met then continue to next constraint
-        if constraint_dict.get(constraint).get('Condition') is not None:
-            if constraint_dict.get(constraint).get('Condition')() == False:
-                print(f"The requirement for constraint {constraint} to apply has not been met, so it has not been applied")
-                continue
-    
-            
-        #Apply LB constraint (checks if callable function for bounds with a formula)
-        if constraint_dict.get(constraint).get('Ug_LB') is not None:
-            if callable(constraint_dict.get(constraint).get('Ug_LB')) == False:
-                instance.MUON_NB.add_component(constraint+'_LB', Constraint(rule = sum(instance.u_g[g] for g in getattr(instance, 'G_'+constraint)) >= constraint_dict.get(constraint).get('Ug_LB')))
-            else:
-                instance.MUON_NB.add_component(constraint+'_LB', Constraint(rule = sum(instance.u_g[g] for g in getattr(instance, 'G_'+constraint)) >= constraint_dict.get(constraint).get('Ug_LB')()))
-            added_constraints += [constraint+'_LB']
-        #Apply UB constraint (checks if callable function for bounds with a formula)
-        if constraint_dict.get(constraint).get('Ug_UB') is not None:
-            if callable(constraint_dict.get(constraint).get('Ug_UB')) == False:
-                instance.MUON_NB.add_component(constraint+'_UB', Constraint(rule = sum(instance.u_g[g] for g in getattr(instance, 'G_'+constraint)) <= constraint_dict.get(constraint).get('Ug_UB')))
-            else:
-                instance.MUON_NB.add_component(constraint+'_UB', Constraint(rule = sum(instance.u_g[g] for g in getattr(instance, 'G_'+constraint)) <= constraint_dict.get(constraint).get('Ug_UB')()))
-            added_constraints += [constraint+'_UB']
-
-
-    print(f"The following NB constraints have been added to the model \n {added_constraints}")        
-    ...
-
-def MUON_NB_BigM_constraints(case, instance, selected_constraints = None):
+def MUON_NB_BigM_constraints(case, instance, constraint_dict, selected_constraints = None):
 
     #Define handling of default constraints to activate
     if selected_constraints == None:
@@ -227,7 +123,7 @@ def MUON_NB_BigM_constraints(case, instance, selected_constraints = None):
         if constraint not in constraints_in_case_dict.keys():
             empty_constraint_sets += [constraint]
     if len(empty_constraint_sets) > 0:
-        raise KeyError(f"No generator sets are defined for the followin MUON NB constraints in the case xls: {empty_constraint_sets} ")
+        raise KeyError(f"No generator sets are defined for the followin MUON NB-BigM constraints in the case xls: {empty_constraint_sets} ")
 
     #Add constraint sets to model
     added_sets = []
@@ -237,24 +133,7 @@ def MUON_NB_BigM_constraints(case, instance, selected_constraints = None):
                                 dimen = 1)
         instance.add_component('G_'+constraint, constraint_set)
         added_sets += [constraint]
-    print(f"The following NB contraint sets have been added to the model \n {added_sets}")
-
-    constraint_dict={
-            "S_NBMIN_CPS": {
-                #TODO Update limit values to real Ireland system
-                "PDlim": 0/instance.baseMVA,
-                "pGlim": 2000/instance.baseMVA,
-                "Ug_LB": 1,
-                "Ug_UB": None, 
-            },
-            "S_NBMIN_MP_NB": {
-                #TODO Update limit values to real Ireland system
-                "pGlim": 130/instance.baseMVA,
-                "Ug_LB": 1,
-                "Ug_UB": None, 
-            },
-
-    }
+    print(f"The following NB-BigM contraint sets have been added to the model \n {added_sets}")
 
     #Constraints Block
     instance.MUON_NB_BigM = Block()
@@ -262,12 +141,8 @@ def MUON_NB_BigM_constraints(case, instance, selected_constraints = None):
     if "S_NBMIN_CPS" in selected_constraints:
         #TODO Update limit values to real Ireland system
 
-        #Create Demand Binary Parameter
-        if sum(instance.PD[d].value for d in instance.D_NI) >= constraint_dict["S_NBMIN_CPS"]["PDlim"]:
-            y_D_CPS = 1
-        else:
-            y_D_CPS = 0
-        instance.MUON_NB_BigM.bMparam_y_D_CPS = Param(within = Binary, initialize = y_D_CPS)
+        #Create Demand Binary Parameter (Function defined to be called in main body, so as to update each iteration)
+        instance.MUON_NB_BigM.bMparam_y_D_CPS = Param(within = Binary, initialize = 0, mutable = True)
         
         #Create variables for generation and overall control
         instance.MUON_NB_BigM.bMvar_y_G_CPS = Var(domain = Binary)
@@ -287,21 +162,50 @@ def MUON_NB_BigM_constraints(case, instance, selected_constraints = None):
 
     if "S_NBMIN_MP_NB" in selected_constraints:
         #TODO Update limit values to real Ireland system
-        #TODO Ensure demand condition is measured against NI demand only
-        #TODO Ensure generation is for wind generation in NI only
 
         #Create variables for generation and overall control
         instance.MUON_NB_BigM.bMvar_y_G_MP_NB = Var(domain = Binary)
         #Create big-M parameters
-        instance.MUON_NB_BigM.bMparam_M_G_MP_NB_L = constraint_dict["S_NBMIN_MP_NB"]["pGlim"] - sum(instance.PGmin[g] for g in instance.G_ns)
-        instance.MUON_NB_BigM.bMparam_M_G_MP_NB_U = sum(instance.PGmax[g] for g in instance.G_ns) - constraint_dict["S_NBMIN_MP_NB"]["pGlim"]
+        instance.MUON_NB_BigM.bMparam_M_G_MP_NB_L = constraint_dict["S_NBMIN_MP_NB"]["pGlim"] - sum(instance.PGmin[g] for g in instance.G_ROI_Wind)
+        instance.MUON_NB_BigM.bMparam_M_G_MP_NB_U = sum(instance.PGmax[g] for g in instance.G_ROI_Wind) - constraint_dict["S_NBMIN_MP_NB"]["pGlim"]
         #Add constraints
-        instance.MUON_NB_BigM.bMconst_M_MP_NB_L = Constraint(rule = constraint_dict["S_NBMIN_MP_NB"]["pGlim"] - sum(instance.pG[g] for g in instance.G_ns) <= instance.MUON_NB_BigM.bMparam_M_G_MP_NB_L * instance.MUON_NB_BigM.bMvar_y_G_MP_NB)
-        instance.MUON_NB_BigM.bMconst_M_MP_NB_U = Constraint(rule = sum(instance.pG[g] for g in instance.G_ns) - constraint_dict["S_NBMIN_MP_NB"]["pGlim"] <=  instance.MUON_NB_BigM.bMparam_M_G_MP_NB_U * (1-instance.MUON_NB_BigM.bMvar_y_G_MP_NB))
+        instance.MUON_NB_BigM.bMconst_M_MP_NB_L = Constraint(rule = constraint_dict["S_NBMIN_MP_NB"]["pGlim"] - sum(instance.pG[g] for g in instance.G_ROI_Wind) <= instance.MUON_NB_BigM.bMparam_M_G_MP_NB_L * instance.MUON_NB_BigM.bMvar_y_G_MP_NB)
+        instance.MUON_NB_BigM.bMconst_M_MP_NB_U = Constraint(rule = sum(instance.pG[g] for g in instance.G_ROI_Wind) - constraint_dict["S_NBMIN_MP_NB"]["pGlim"] <=  instance.MUON_NB_BigM.bMparam_M_G_MP_NB_U * (1-instance.MUON_NB_BigM.bMvar_y_G_MP_NB))
         instance.MUON_NB_BigM.S_NBMIN_MP_NB = Constraint(rule = sum(instance.u_g[g] for g in instance.G_S_NBMIN_MP_NB) >= constraint_dict["S_NBMIN_MP_NB"]["Ug_LB"] * instance.MUON_NB_BigM.bMvar_y_G_MP_NB)
         print(f"Big-M NB constraint [S_NBMIN_MP_NB] added to instance")
 
-  
+def MUON_conditional_activation(instance, constraint_dict, selected_constraints = None):
+        MUON_block = getattr(instance, "MUON")
+        
+
+        for constraint in selected_constraints:
+            #Get constraint condition
+            constraint_condition = constraint_dict.get(constraint).get('Condition', None)
+
+            #Check if a condition applies to constraint. if it does and isn't met then continue to next constraint
+            if constraint_condition is None:
+                continue
+            else:
+                if constraint_condition() == True:
+                    getattr(MUON_block, constraint) .activate()
+
+                if constraint_condition() == False:
+                    print(f"The requirement for constraint {constraint} to apply has not been met, so it has not been applied")
+                    continue
+
+def MUON_NB_BigM_param_update(instance, constraint_dict):
+    #Update y binary parameter for S_NBMIN_CPS
+    if sum(instance.PD[d].value for d in instance.D_NI) >= constraint_dict["S_NBMIN_CPS"]["PDlim"]:
+        instance.MUON_NB_BigM.bMparam_y_D_CPS = 1
+    else:
+        instance.MUON_NB_BigM.bMparam_y_D_CPS = 0
+
+
+#========== START OF MODEL FUNCTION =============#
+
+
+
+
 def model(case: object, solver):
     #Create Model & Instance
     model = AbstractModel()
@@ -505,16 +409,127 @@ def model(case: object, solver):
                                 ComponentName.gen_prorata_curtailment_realpower,
                                 ComponentName.gen_SNSP]
     build_constraints(instance, copper_plate_secure_constraints)
-        
+    
+
     #- MUON MW Constraints
+    MUON_MW_constraint_dict={
+        "S_MWMAX_NI_GT": {
+            "PG_LB": None,
+            "PG_UB": 272/instance.baseMVA,
+            "type": "MW" 
+        },
+        "S_MWMIN_EWIC": {
+            "PG_LB": -526/instance.baseMVA ,
+            "PG_UB": None,
+            "type": "MW" 
+        },
+        "S_MWMAX_EWIC": {
+            "PG_LB": None,
+            "PG_UB": 504/instance.baseMVA,
+            "type": "MW"   
+        },
+        "S_MWMIN_MOYLE": {
+            "PG_LB": -410/instance.baseMVA ,
+            "PG_UB": None,
+            "type": "MW" 
+        },
+        "S_MWAX_MOYLE": {
+            "PG_LB": None,
+            "PG_UB": 441/instance.baseMVA,
+            "type": "MW"    
+        },
+        "S_REP_ROI": {
+            "PG_LB": None,
+            "PG_UB": lambda: sum(instance.PGmax[g] for g in instance.G_S_REP_ROI) - 80/instance.baseMVA,
+            "type": "MW"  
+        },
+        "S_MWMAX_CRK_MW": {
+            "PG_LB": None,
+            "PG_UB": 1370/instance.baseMVA,
+            "type": "MW"   
+        },
+        "S_MWMAX_STH_MW": {
+            "PG_LB": None,
+            "PG_UB": 1835/instance.baseMVA,
+            "type": "MW"   
+        },
+    }
     MUON_MW_constraint_list = ['S_MWMAX_NI_GT', 'S_REP_ROI']
-    MUON_MW_constraints(case, instance, selected_constraints = MUON_MW_constraint_list)
+    MUON_constraints(case, instance, MUON_MW_constraint_dict, selected_constraints = MUON_MW_constraint_list)
+    
+    
     #- MUON NB Constraints
+    MUON_NB_constraint_dict={
+        "S_NBMIN_MINNIU": {
+            "Condition": None,
+            "Ug_LB": 3,
+            "Ug_UB": None,
+            "type": "NB"  
+        },
+        "S_NBMIN_MINNI3": {
+            "Condition": None,
+            "Ug_LB": 1,
+            "Ug_UB": None,
+            "type": "NB" 
+        },
+        "S_NBMIN_ROImin": {
+            "Condition": None,
+            "Ug_LB": 4,
+            "Ug_UB": None,
+            "type": "NB" 
+        },
+        "S_NBMIN_DubNB": {
+            "Condition": None,
+            "Ug_LB": 1,
+            "Ug_UB": None,
+            "type": "NB" 
+        },
+        "S_NBMIN_DubNB2": {
+            "Condition": None,
+            "Ug_LB": 2,
+            "Ug_UB": None,
+            "type": "NB" 
+        },
+        "S_NBMIN_DUB_L1": {
+            "Condition": lambda: sum(instance.PD[d].value for d in instance.D_ROI) >= 4000/instance.baseMVA,
+            "Ug_LB": 3,
+            "Ug_UB": None,
+            "type": "NB" 
+        },
+        "S_NBMIN_DUB_L2": {
+            "Condition": lambda: sum(instance.PD[d].value for d in instance.D_ROI) >= 0/instance.baseMVA,
+            "Ug_LB": 1,
+            "Ug_UB": None,
+            "type": "NB" 
+        },
+        "MP5_NB": {
+            "Ug_LB": None,
+            "Ug_UB": 1,
+            "type": "NB" 
+        },
+    }
     MUON_NB_constraints_list = ['S_NBMIN_DUB_L2']
-    MUON_NB_constraints(case, instance, selected_constraints = MUON_NB_constraints_list)
+    MUON_constraints(case, instance, MUON_NB_constraint_dict, selected_constraints = MUON_NB_constraints_list)
+    
     #- MUON NB Big-M Constraints
+    MUON_NB_bigM_constraint_dict={
+            "S_NBMIN_CPS": {
+                #TODO Update limit values to real Ireland system
+                "PDlim": 100/instance.baseMVA, #When demand above this value
+                "pGlim": 25/instance.baseMVA, #And wind in NI below this value
+                "Ug_LB": 1,
+                "Ug_UB": None, 
+            },
+            "S_NBMIN_MP_NB": {
+                #TODO Update limit values to real Ireland system
+                "pGlim": 40/instance.baseMVA, #When wind generation in ROI less than                                    
+                "Ug_LB": 1,
+                "Ug_UB": None, 
+            },
+
+    }
     MUON_NB_bigM_constraints_list = ['S_NBMIN_CPS','S_NBMIN_MP_NB']
-    MUON_NB_BigM_constraints(case, instance, selected_constraints = MUON_NB_bigM_constraints_list)
+    MUON_NB_BigM_constraints(case, instance, MUON_NB_bigM_constraint_dict, selected_constraints = MUON_NB_bigM_constraints_list)
 
     #DCOPF MODEL CONSTRAINTS #
     dcopf_constraints = [#Power Balance - Kirchoffs Current Law (P
@@ -545,15 +560,11 @@ def model(case: object, solver):
 
     #Deactivate all constraints ready for iteration
     global_constraints = ['KCL_copperplate', 'demand_real_alpha_controlled', 'demand_alpha_max', 'demand_alpha_fixneg', 'gen_uc_max', 'gen_uc_min', 'gen_market_redispatch', 'gen_prorata_curtailment_realpower', 'gen_SNSP', 'KCL_networked_realpower_noshunt', 'KVL_DCOPF_lines', 'KVL_DCOPF_transformer', 'line_cont_realpower_max_ngtve', 'line_cont_realpower_max_pstve', 'volts_line_delta', 'transf_continuous_real_max_ngtve', 'transf_continuous_real_max_pstve', 'volts_transformer_delta', 'volts_reference_bus', 'gen_secure_redispatch', 'gen_prorata_realpower_max_xi', 'gen_prorata_realpower_min_xi', 'gen_prorata_xi_max', 'gen_prorata_xi_min', 'gen_prorata_beta']
-    block_constraints =  ['MUON_MW', 'MUON_NB', 'MUON_NB_BigM']
+    block_constraints =  ['MUON', 'MUON_NB_BigM']
     for c in global_constraints:
         getattr(instance, c).deactivate()
     for block in block_constraints:
         getattr(instance, block).deactivate()
-
-
-
-
 
 
 
@@ -564,8 +575,12 @@ def model(case: object, solver):
         output[iteration] = {}
         result[iteration] = {}
 
+        #~~~~~~~~~~~# ITERATION INPUT DATA UPDATES #~~~~~~~~~~~#
         #Update parameters for current timestep
         add_iteration_params_to_instance(instance, case, ts_params, iteration)
+
+        #Update big-M binary parameters for this iteration
+        MUON_NB_BigM_param_update(instance, MUON_NB_bigM_constraint_dict)
 
         #Update any sets for current timestep
         add_iteration_sets_to_instance(instance, case, ts_sets, iteration)
@@ -597,17 +612,17 @@ def model(case: object, solver):
         for g in instance.G:
             instance.UG_MARKET[g] = round(instance.u_g[g].value, 0)
 
-        #Define Data to Save
-        data_to_cache = {"Var": [], 
-                    "Param" : [],
-                    "Set" : []}
+        # #Define Data to Save
+        # data_to_cache = {"Var": [], 
+        #             "Param" : [],
+        #             "Set" : []}
         
-        #Cache Data
-        output[iteration]["copper_market"] = pyomo_io.InstanceCache(result[iteration]["copper_market"], data_to_cache)
-        output[iteration]["copper_market"].set(instance)
-        output[iteration]["copper_market"].var(instance)
-        output[iteration]["copper_market"].param(instance)
-        output[iteration]["copper_market"].obj_value(instance)
+        # #Cache Data
+        # output[iteration]["copper_market"] = pyomo_io.InstanceCache(result[iteration]["copper_market"], data_to_cache)
+        # output[iteration]["copper_market"].set(instance)
+        # output[iteration]["copper_market"].var(instance)
+        # output[iteration]["copper_market"].param(instance)
+        # output[iteration]["copper_market"].obj_value(instance)
 
         #~~~~~~~~~~~# COPPER PLATE 'SECURE' MODEL SECTION #~~~~~~~~~~~#
         #Add Constraints (Except MUON Constraints)
@@ -622,11 +637,16 @@ def model(case: object, solver):
         for c in secure_constraints_to_activate:
             getattr(instance, c).activate()
 
-        #Add MUON Constraints
-        secure_block_constraints_to_activate = ['MUON_MW', 'MUON_NB', 'MUON_NB_BigM']
-        for c in secure_block_constraints_to_activate:
-            getattr(instance, c).activate()
 
+        #Activate overall MUON docs
+        getattr(instance, "MUON").activate()
+        getattr(instance, "MUON_NB_BigM").activate()
+
+        #Conditionally activate MUON MW and NB constraints
+        MUON_conditional_activation(instance,
+                                    MUON_MW_constraint_dict | MUON_NB_constraint_dict,
+                                    MUON_MW_constraint_list+MUON_NB_constraints_list)
+    
         #Update Objective
         instance.del_component(instance.OBJ)
         instance.OBJ = Objective(rule = redispatch_from_market_cost_objective(instance), sense = minimize)
@@ -641,17 +661,17 @@ def model(case: object, solver):
         for g in instance.G:
             instance.UG_SECURE[g] = round(instance.u_g[g].value, 0)
 
-        #Define Data to Save
-        data_to_cache = {"Var": [], 
-                    "Param" : [],
-                    "Set" : []}
+        # #Define Data to Save
+        # data_to_cache = {"Var": [], 
+        #             "Param" : [],
+        #             "Set" : []}
         
-        #Cache Data
-        output[iteration]["copper_curtailed"] = pyomo_io.InstanceCache(result[iteration]["copper_curtailed"], data_to_cache)
-        output[iteration]["copper_curtailed"].set(instance)
-        output[iteration]["copper_curtailed"].var(instance)
-        output[iteration]["copper_curtailed"].param(instance)
-        output[iteration]["copper_curtailed"].obj_value(instance)
+        # #Cache Data
+        # output[iteration]["copper_curtailed"] = pyomo_io.InstanceCache(result[iteration]["copper_curtailed"], data_to_cache)
+        # output[iteration]["copper_curtailed"].set(instance)
+        # output[iteration]["copper_curtailed"].var(instance)
+        # output[iteration]["copper_curtailed"].param(instance)
+        # output[iteration]["copper_curtailed"].obj_value(instance)
 
 
         #~~~~~~~~~~~# DCOPF MODEL SECTION #~~~~~~~~~~~#
@@ -738,10 +758,13 @@ def model(case: object, solver):
                                      #Prorata Curtailment
                                      'gen_prorata_realpower_max_xi', 'gen_prorata_realpower_min_xi', 'gen_prorata_xi_max', 'gen_prorata_xi_min', 'gen_prorata_beta',
                                      #MUON Constraint Blocks
-                                    'MUON_MW', 'MUON_NB', 'MUON_NB_BigM']
+                                    'MUON', 'MUON_NB_BigM']
         
         for c in constraints_to_deactivate_to_end_dcopf:
             getattr(instance, c).deactivate()
+        
+        #Delete objective
+        instance.del_component(instance.OBJ)
     
         #~~~~~~~~~~~# CALCULATE CURTAILMENT AND CONSTRAINT VOLUMES #~~~~~~~~~~~#
         #Calculate overall surplus volumes, and surplus per generator

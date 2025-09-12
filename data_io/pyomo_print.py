@@ -19,10 +19,10 @@ def all_island_iterations_summary_df(case, output):
             sum(output_data.pD.values()) * baseMVA,
             sum(output_data.pG[g] for g in output_data.G_s) * baseMVA,
             sum(output_data.PGmax[g] for g in output_data.G_ns) * baseMVA,
-            sum(output_data.pG[g] for g in output_data.G_ns) * baseMVA,
-            sum(output_data.PGmax[g] - output_data.pG[g] for g in output_data.G_ns) * baseMVA,
-            (output_data.V_Surplus + output_data.V_SNSP + output_data.V_MUON) * baseMVA,
             output_data.V_Surplus * baseMVA,
+            sum(output_data.pG[g] for g in output_data.G_ns) * baseMVA,
+            sum(output_data.PG_MARKET[g] - output_data.pG[g] for g in output_data.G_ns) * baseMVA,
+            (output_data.V_SNSP + output_data.V_MUON) * baseMVA,
             output_data.V_SNSP * baseMVA,
             output_data.V_MUON * baseMVA,
             output_data.V_Constraint * baseMVA,
@@ -36,10 +36,10 @@ def all_island_iterations_summary_df(case, output):
         "demand met (MW)",
         "synchronous generation (MW)",
         "non-synchronous availability (MW)",
+        "surplus (MW)",
         "non-synchronous generation (MW)",
         "dispatch down (MW)",
         "total curtailment (MW)",
-        "SURPLUS curtailment (MW)",
         "SNSP curtailment (MW)",
         "MUON curtailment (MW)",
         "constraint (MW)"
@@ -68,7 +68,7 @@ def df_summarised_by_bus(case, output, sub_output, param, param_index, multiplie
     return df
 
 
-def df_by_own_index(case, output, sub_output, param, multiplier = None):
+def df_param_by_param_index(case, output, sub_output, param, param_index, multiplier = None):
     #Creates a dataframe of output values broken down as per their index
     df = pd.DataFrame()
     if multiplier == None:
@@ -78,10 +78,28 @@ def df_by_own_index(case, output, sub_output, param, multiplier = None):
         #Define Output of interest
         output_data = output.get(iteration).get(sub_output)
 
-        row = pd.DataFrame([iteration]+[value*multiplier for value in getattr(output_data, param).values()]).T
+        row = pd.DataFrame([iteration]+[getattr(output_data, param)[index]*multiplier for index in getattr(output_data, param_index)]).T
         df = pd.concat([df, row], ignore_index=True)
     
-    df.columns = ['iteration'] + [key for key in getattr(output_data, param)]
+    df.columns = ['iteration'] + [key for key in getattr(output_data, param_index)]
+    return df
+
+def df_proportion_param_by_param_index(case, output, sub_output, param, param_index, divider, multiplier = None):
+    #Creates a dataframe of output values broken down as per their index
+    df = pd.DataFrame()
+    if multiplier == None:
+        multiplier = 1
+
+    for iteration in case.iterations:
+        #Define Output of interest
+        output_data = output.get(iteration).get(sub_output)
+
+        row = pd.DataFrame([iteration]+[getattr(output_data, param)[index]*(1/getattr(output_data, divider)[index])
+                                        if getattr(output_data, divider)[index] > 0 else 0 
+                                        for index in getattr(output_data, param_index)]).T
+        df = pd.concat([df, row], ignore_index=True)
+    
+    df.columns = ['iteration'] + [key for key in getattr(output_data, param_index)]
     return df
 
 
@@ -93,7 +111,7 @@ def all_island_timeseries_to_excel(case, output):
 
     #Define which parameters to summarise on a buswise basis:
     summarised_by_bus_outputs = {
-        'PD': {'sub_output':'copper_market',
+        'PD': {'sub_output':'dcopf',
                       'param':'PD',
                       'param_index':'demands',
                       'multiplier':case.baseMVA
@@ -143,76 +161,132 @@ def all_island_timeseries_to_excel(case, output):
     by_own_index_outputs = {
         'pD_d': {'sub_output':'dcopf',
                       'param':'PD',
+                      'param_index': 'D',
                       'multiplier':case.baseMVA
                       }, 
         'alpha_d': {'sub_output':'dcopf',
                       'param':'alpha',
+                      'param_index': 'D',
                       'multiplier':None
                       },
         'bus_angle': {'sub_output':'dcopf',
                       'param':'delta',
+                      'param_index': 'B',
                       'multiplier':180/math.pi
                       },
         'line_delta': {'sub_output':'dcopf',
                       'param':'deltaL',
+                      'param_index': 'L',
                       'multiplier':180/math.pi
                       },
         'transf_delta': {'sub_output':'dcopf',
                       'param':'deltaLT',
+                      'param_index': 'TRANSF',
                       'multiplier':180/math.pi
                       },
         'line_flow': {'sub_output':'dcopf',
                       'param':'pL',
+                      'param_index': 'L',
                       'multiplier':case.baseMVA
                       },
         'transf_flow': {'sub_output':'dcopf',
-                      'param':'pL',
+                      'param':'pLT',
+                      'param_index': 'TRANSF',
                       'multiplier':case.baseMVA
                       },
         'pG': {'sub_output':'dcopf',
                       'param':'pG',
+                      'param_index': 'G',
                       'multiplier':case.baseMVA
                       },
         'PG_MARKET': {'sub_output':'dcopf',
                       'param':'PG_MARKET',
+                      'param_index': 'G',
                       'multiplier':case.baseMVA
                       },
         'PG_SECURE': {'sub_output':'dcopf',
                       'param':'PG_SECURE',
+                      'param_index': 'G',
                       'multiplier':case.baseMVA
-                      },  
+                      },
+        'UG_MARKET': {'sub_output':'dcopf',
+                      'param':'UG_MARKET',
+                      'param_index': 'G',
+                      'multiplier':None
+                      },
+        'UG_SECURE': {'sub_output':'dcopf',
+                      'param':'UG_SECURE',
+                      'param_index': 'G',
+                      'multiplier':None
+                      },    
         'Surplus': {'sub_output':'dcopf',
                       'param':'v_Surplus_g',
+                      'param_index': 'G',
                       'multiplier':case.baseMVA
                       },
         'SNSP': {'sub_output':'dcopf',
                       'param':'v_SNSP_g',
+                      'param_index': 'G',
                       'multiplier':case.baseMVA
                       },
         'MUON': {'sub_output':'dcopf',
                       'param':'v_MUON_g',
+                      'param_index': 'G',
                       'multiplier':case.baseMVA
                       },  
         'Constraint': {'sub_output':'dcopf',
                       'param':'v_Constraint_g',
+                      'param_index': 'G',
                       'multiplier':case.baseMVA
-                      },                             
+                      },                       
     }
 
     #Add parameters on a self indexed basis to sheets dataframe
     for name, config in by_own_index_outputs.items():
-        sheets_dict[name] = df_by_own_index(case,
+        sheets_dict[name] = df_param_by_param_index(case,
                                                output,
                                                config.get('sub_output'),
                                                config.get('param'),
+                                               config.get('param_index'),
                                                config.get('multiplier'))
-        
+
+    #Define which parameters to summarise on a self indexed basis:
+    proportionate_by_own_index_outputs = {
+        'SNSP_%': {'sub_output':'dcopf',
+                      'param':'v_SNSP_g',
+                      'param_index': 'G',
+                      'divider': 'PG_MARKET',
+                      'multiplier':case.baseMVA
+                      },
+        'MUON-%': {'sub_output':'dcopf',
+                      'param':'v_MUON_g',
+                      'param_index': 'G',
+                      'divider': 'PG_MARKET',
+                      'multiplier':case.baseMVA
+                      },  
+        'Constraint_%': {'sub_output':'dcopf',
+                      'param':'v_Constraint_g',
+                      'param_index': 'G',
+                      'divider': 'PG_SECURE',
+                      'multiplier':case.baseMVA
+                      },
+        }
+
+    #Add parameters on a self indexed basis to sheets dataframe
+    for name, config in proportionate_by_own_index_outputs.items():
+        sheets_dict[name] = df_proportion_param_by_param_index(case,
+                                               output,
+                                               config.get('sub_output'),
+                                               config.get('param'),
+                                               config.get('param_index'),
+                                               config.get('divider'),
+                                               config.get('multiplier'))   
+
     #Create Excel Page
     with pd.ExcelWriter('results.xlsx', engine ='xlsxwriter') as writer:
         for sheet_id, sheet in sheets_dict.items():
             sheet.to_excel(writer, sheet_name = sheet_id, index = False)
 
-    ...
 
 
 
