@@ -30,7 +30,7 @@ def copper_plate_marginal_cost_objective(instance):
     '''
     rnd = np.random.default_rng(100)
 
-    obj = sum((instance.c_1[g]+rnd.random())*instance.pG[g]+(instance.u_g[g] * instance.c_0[g]/instance.baseMVA) for g in instance.G) +\
+    obj = sum((instance.c_1[g]+rnd.random())*instance.pG[g] for g in instance.G) +\
           sum(instance.VOLL[d]*(1-instance.alpha[d])*instance.PD[d] for d in instance.D)
     return obj
 
@@ -48,7 +48,7 @@ def redispatch_from_market_cost_objective(instance):
 
     obj = sum((instance.c_bid[g]+rnd.random())*instance.pG_bid[g] 
               +(instance.c_offer[g]+rnd.random())*instance.pG_offer[g]
-              +(instance.c_0[g]*instance.u_g[g])*(1-instance.UG_MARKET[g])
+              +(instance.c_0[g]*instance.u_g[g])
               for g in instance.G)\
         +sum(instance.VOLL[d]*(1-instance.alpha[d])*instance.PD[d] for d in instance.D)
     return obj

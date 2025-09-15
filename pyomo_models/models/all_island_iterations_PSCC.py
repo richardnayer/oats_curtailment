@@ -393,9 +393,11 @@ def model(case: object, solver):
                                 ComponentName.demand_alpha_max,
                                 ComponentName.demand_alpha_fixneg,
                                  
-                                 #Generation Constraints
-                                 ComponentName.gen_uc_max,
-                                 ComponentName.gen_uc_min]
+                                #Generation Constraints
+                                ComponentName.gen_forced_individual_realpower_min,
+                                ComponentName.gen_forced_individual_realpower_max,
+                                ComponentName.gen_uc_min,
+                                ComponentName.gen_uc_max]
     build_constraints(instance, copper_plate_market_constraints)
 
     #COPPER PLATE SECURE MODEL CONSTRAINTS #
@@ -555,7 +557,7 @@ def model(case: object, solver):
     build_constraints(instance, dcopf_constraints)
 
     #Deactivate all constraints ready for iteration
-    global_constraints = ['KCL_copperplate', 'demand_real_alpha_controlled', 'demand_alpha_max', 'demand_alpha_fixneg', 'gen_uc_max', 'gen_uc_min', 'gen_market_redispatch', 'gen_prorata_curtailment_realpower', 'gen_SNSP', 'KCL_networked_realpower_noshunt', 'KVL_DCOPF_lines', 'KVL_DCOPF_transformer', 'line_cont_realpower_max_ngtve', 'line_cont_realpower_max_pstve', 'volts_line_delta', 'transf_continuous_real_max_ngtve', 'transf_continuous_real_max_pstve', 'volts_transformer_delta', 'volts_reference_bus', 'gen_secure_redispatch', 'gen_prorata_realpower_max_xi', 'gen_prorata_realpower_min_xi', 'gen_prorata_xi_max', 'gen_prorata_xi_min', 'gen_prorata_beta']
+    global_constraints = ['KCL_copperplate', 'demand_real_alpha_controlled', 'demand_alpha_max', 'demand_alpha_fixneg', 'gen_uc_min', 'gen_uc_max', 'gen_forced_individual_realpower_min', 'gen_forced_individual_realpower_max', 'gen_market_redispatch', 'gen_prorata_curtailment_realpower', 'gen_SNSP', 'KCL_networked_realpower_noshunt', 'KVL_DCOPF_lines', 'KVL_DCOPF_transformer', 'line_cont_realpower_max_ngtve', 'line_cont_realpower_max_pstve', 'volts_line_delta', 'transf_continuous_real_max_ngtve', 'transf_continuous_real_max_pstve', 'volts_transformer_delta', 'volts_reference_bus', 'gen_secure_redispatch', 'gen_prorata_realpower_max_xi', 'gen_prorata_realpower_min_xi', 'gen_prorata_xi_max', 'gen_prorata_xi_min', 'gen_prorata_beta']
     block_constraints =  ['MUON', 'MUON_NB_BigM']
     for c in global_constraints:
         getattr(instance, c).deactivate()
@@ -588,8 +590,8 @@ def model(case: object, solver):
                                    ComponentName.demand_alpha_max,
                                    ComponentName.demand_alpha_fixneg,
                                    #Add Generation Constraints
-                                   ComponentName.gen_uc_max,
-                                   ComponentName.gen_uc_min
+                                   ComponentName.gen_forced_individual_realpower_min,
+                                   ComponentName.gen_forced_individual_realpower_max
                                 ]
         
         for c in market_constraints_to_activate:
@@ -605,9 +607,6 @@ def model(case: object, solver):
         for g in instance.G:
             instance.PG_MARKET[g] = round(instance.pG[g].value, 6)
 
-        for g in instance.G:
-            instance.UG_MARKET[g] = round(instance.u_g[g].value, 0)
-
         # #Define Data to Save
         # data_to_cache = {"Var": [], 
         #             "Param" : [],
@@ -621,8 +620,20 @@ def model(case: object, solver):
         # output[iteration]["copper_market"].obj_value(instance)
 
         #~~~~~~~~~~~# COPPER PLATE 'SECURE' MODEL SECTION #~~~~~~~~~~~#
+        #Remove generation constraint that doesn't respect on/off states.
+        constraints_to_deactivate_for_secure = [#Generation constraints used in previous models (superceeded by updated PGmax)
+                                 ComponentName.gen_forced_individual_realpower_min,
+                                 ComponentName.gen_forced_individual_realpower_max]
+        
+        for c in constraints_to_deactivate_for_secure:
+            getattr(instance, c).deactivate()
+
         #Add Constraints (Except MUON Constraints)
-        secure_constraints_to_activate = [#Market Redispatch
+        secure_constraints_to_activate = [#Respecting Minimum Generation
+                                          ComponentName.gen_uc_min,
+                                          ComponentName.gen_uc_max,  
+            
+                                        #Market Redispatch
                                          ComponentName.gen_market_redispatch,
                                          #Prorata Curtailment
                                          ComponentName.gen_prorata_curtailment_realpower,
@@ -641,7 +652,7 @@ def model(case: object, solver):
         #Conditionally activate MUON MW and NB constraints
         MUON_conditional_activation(instance,
                                     MUON_MW_constraint_dict | MUON_NB_constraint_dict,
-                                    MUON_MW_constraint_list+MUON_NB_constraints_list)
+                                    MUON_MW_constraint_list + MUON_NB_constraints_list)
     
         #Update Objective
         instance.del_component(instance.OBJ)
@@ -743,7 +754,10 @@ def model(case: object, solver):
 
         #~~~~~~~~~~~# COPPER PLATE TEST CODE RESET #~~~~~~~~~~~#
         #list of constraints to deactivate
-        constraints_to_deactivate_to_end_dcopf = [#SNSP Constraint
+        constraints_to_deactivate_to_end_dcopf = [
+                                     #Generation
+                                     'gen_uc_max', 'gen_uc_min',
+                                     #SNSP Constraint
                                      'gen_SNSP',
                                      #KCL Power Balance
                                      'KCL_networked_realpower_noshunt',

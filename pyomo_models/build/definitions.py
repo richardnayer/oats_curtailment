@@ -676,7 +676,7 @@ class Constraint_Blocks:
             ComponentName.gen_forced_individual_realpower_min: ConstraintDef(
                 index=ComponentName.G,
                 rule=lambda instance, generator: instance.pG[generator]
-                >= instance.PGmin[generator],
+                >= 0,
             ),
 
             # --- Individual EER Policy (Synchronous Only) ---
