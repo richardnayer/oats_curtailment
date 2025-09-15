@@ -121,6 +121,16 @@ def all_island_timeseries_to_excel(case, output):
                       'param_index':'generators',
                       'multiplier':case.baseMVA
                       },
+        'PG_MARKET': {'sub_output':'dcopf',
+                      'param':'PG_MARKET',
+                      'param_index':'generators',
+                      'multiplier':case.baseMVA
+                      },
+        'PG_SECURE': {'sub_output':'dcopf',
+                      'param':'PG_SECURE',
+                      'param_index':'generators',
+                      'multiplier':case.baseMVA
+                      },
         'PGmax': {'sub_output':'dcopf',
                       'param':'PGmax',
                       'param_index':'generators',

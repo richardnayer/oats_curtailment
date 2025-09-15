@@ -222,8 +222,6 @@ def model(case: object, solver):
         ComponentName.b0,
         ComponentName.G,
         ComponentName.generator_mapping,
-        ComponentName.G_LIFO,
-        ComponentName.G_LIFO_pairs,
         ComponentName.G_prorata,
         ComponentName.G_prorata_map,
         ComponentName.G_prorata_pairs,
@@ -376,9 +374,6 @@ def model(case: object, solver):
         ComponentName.beta_prorata,
         ComponentName.prorata_minimum_zeta,
         ComponentName.prorata_curtailment_zeta,
-        ComponentName.MINGEN_zeta,
-        ComponentName.gamma,
-        ComponentName.beta,
         ComponentName.deltaL,
         ComponentName.deltaLT,
         ComponentName.delta,
@@ -412,10 +407,11 @@ def model(case: object, solver):
     
 
     #- MUON MW Constraints
+    #TODO - Update limits for Ireland
     MUON_MW_constraint_dict={
         "S_MWMAX_NI_GT": {
             "PG_LB": None,
-            "PG_UB": 272/instance.baseMVA,
+            "PG_UB": 80/instance.baseMVA,
             "type": "MW" 
         },
         "S_MWMIN_EWIC": {
@@ -454,7 +450,7 @@ def model(case: object, solver):
             "type": "MW"   
         },
     }
-    MUON_MW_constraint_list = ['S_MWMAX_NI_GT', 'S_REP_ROI']
+    MUON_MW_constraint_list = ['S_MWMAX_NI_GT']
     MUON_constraints(case, instance, MUON_MW_constraint_dict, selected_constraints = MUON_MW_constraint_list)
     
     
@@ -528,7 +524,7 @@ def model(case: object, solver):
             },
 
     }
-    MUON_NB_bigM_constraints_list = ['S_NBMIN_CPS','S_NBMIN_MP_NB']
+    MUON_NB_bigM_constraints_list = []
     MUON_NB_BigM_constraints(case, instance, MUON_NB_bigM_constraint_dict, selected_constraints = MUON_NB_bigM_constraints_list)
 
     #DCOPF MODEL CONSTRAINTS #
@@ -775,7 +771,7 @@ def model(case: object, solver):
 
         #Calculate overall SNSP volume. Then divide by non-synchronous generators pro-rata.
         setattr(output[iteration]["dcopf"], 'V_SNSP', max(0, sum(instance.PG_MARKET[g].value for g in instance.G_ns) - 0.75*sum(instance.PG_MARKET[g].value for g in instance.G)))
-        setattr(output[iteration]["dcopf"], 'x_SNSP', max(0, sum(instance.PG_MARKET[g].value for g in instance.G_ns)/sum(instance.PG_MARKET[g].value for g in instance.G) - 0.75))
+        setattr(output[iteration]["dcopf"], 'x_SNSP', max(0, sum(instance.PG_MARKET[g].value for g in instance.G_ns)/sum(instance.PG_MARKET[g].value for g in instance.G_ns) - 0.75))
         setattr(output[iteration]["dcopf"], 'v_SNSP_g', {g: (instance.PG_MARKET[g].value * output[iteration]["dcopf"].x_SNSP) for g in instance.G_ns})
         output[iteration]["dcopf"].v_SNSP_g.update({g: 0 for g in instance.G_s})
 
