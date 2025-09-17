@@ -177,7 +177,7 @@ def add_iteration_params_to_instance(instance: Any, case: Any, param_list: list[
         ComponentName.VOLL: lambda: helpers.get_ts_param_dict(case, "ts_VOLL", iteration),
         ComponentName.line_max_continuous_P: lambda: helpers.get_ts_param_dict(case, "ts_Lmax", iteration, baseMVA = case.baseMVA),
         ComponentName.transformer_max_continuous_P: lambda: helpers.get_ts_param_dict(case, "ts_TLmax", iteration, baseMVA = case.baseMVA),
-        ComponentName.PGMINGEN: lambda: helpers.get_ts_param_dict(case, "ts_PGMINGEN", iteration, baseMVA = case.baseMVA),
+        # ComponentName.PGMINGEN: lambda: helpers.get_ts_param_dict(case, "ts_PGMINGEN", iteration, baseMVA = case.baseMVA),
         ComponentName.PGmin: lambda: helpers.get_ts_param_dict(case, "ts_PGLB", iteration, baseMVA = case.baseMVA),
         ComponentName.PGmax: lambda: helpers.get_ts_param_dict(case, "ts_PGUB", iteration, baseMVA = case.baseMVA),
         ComponentName.c_bid: lambda: helpers.get_ts_param_dict(case, "ts_bid", iteration),

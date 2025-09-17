@@ -48,7 +48,7 @@ class Sets_Blocks:
             # --- SETS FOR BUSSES ---
             # Set of busses
             ComponentName.B: SetDef(
-                initialize=lambda: helpers.get_param_list(case, "busses", "name"),
+                initialize=lambda: helpers.get_param_list(case, "busses", "name", "type", "!=", 0),
             ),
             # -> Set of slack bus (i.e. fixed voltage bus)
             ComponentName.b0: SetDef(

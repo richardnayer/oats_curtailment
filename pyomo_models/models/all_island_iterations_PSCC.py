@@ -319,7 +319,7 @@ def model(case: object, solver):
         ComponentName.VOLL, #Defined each timestep
         ComponentName.PGmax, #Defined each timestep
         ComponentName.PGmin, #Defined each timestep
-        ComponentName.PGMINGEN,
+        # ComponentName.PGMINGEN,
         ComponentName.c_0, #Defined each timestep
         ComponentName.c_1,
         ComponentName.c_bid, #Defined each timestep
@@ -336,7 +336,7 @@ def model(case: object, solver):
                 ComponentName.transformer_max_continuous_P,
                 ComponentName.PGmin,
                 ComponentName.PGmax,
-                ComponentName.PGMINGEN,
+                # ComponentName.PGMINGEN,
                 ComponentName.c_bid] 
 
     #Special Model Parameters
@@ -407,11 +407,10 @@ def model(case: object, solver):
     
 
     #- MUON MW Constraints
-    #TODO - Update limits for Ireland
     MUON_MW_constraint_dict={
         "S_MWMAX_NI_GT": {
             "PG_LB": None,
-            "PG_UB": 80/instance.baseMVA,
+            "PG_UB": 272/instance.baseMVA,
             "type": "MW" 
         },
         "S_MWMIN_EWIC": {
@@ -436,7 +435,7 @@ def model(case: object, solver):
         },
         "S_REP_ROI": {
             "PG_LB": None,
-            "PG_UB": lambda: sum(instance.PGmax[g] for g in instance.G_S_REP_ROI) - 80/instance.baseMVA,
+            "PG_UB": lambda: sum(instance.PGmax[g] for g in instance.G_S_REP_ROI) - 325/instance.baseMVA,
             "type": "MW"  
         },
         "S_MWMAX_CRK_MW": {
@@ -476,25 +475,25 @@ def model(case: object, solver):
         },
         "S_NBMIN_DubNB": {
             "Condition": None,
-            "Ug_LB": 1,
+            "Ug_LB": 2,
             "Ug_UB": None,
             "type": "NB" 
         },
         "S_NBMIN_DubNB2": {
             "Condition": None,
-            "Ug_LB": 2,
+            "Ug_LB": 1,
             "Ug_UB": None,
             "type": "NB" 
         },
         "S_NBMIN_DUB_L1": {
             "Condition": lambda: sum(instance.PD[d].value for d in instance.D_ROI) >= 4000/instance.baseMVA,
-            "Ug_LB": 3,
+            "Ug_LB": 2,
             "Ug_UB": None,
             "type": "NB" 
         },
         "S_NBMIN_DUB_L2": {
-            "Condition": lambda: sum(instance.PD[d].value for d in instance.D_ROI) >= 0/instance.baseMVA,
-            "Ug_LB": 1,
+            "Condition": lambda: sum(instance.PD[d].value for d in instance.D_ROI) >= 4700/instance.baseMVA,
+            "Ug_LB": 3,
             "Ug_UB": None,
             "type": "NB" 
         },
@@ -510,15 +509,13 @@ def model(case: object, solver):
     #- MUON NB Big-M Constraints
     MUON_NB_bigM_constraint_dict={
             "S_NBMIN_CPS": {
-                #TODO Update limit values to real Ireland system
-                "PDlim": 100/instance.baseMVA, #When demand above this value
-                "pGlim": 25/instance.baseMVA, #And wind in NI below this value
+                "PDlim": 1550/instance.baseMVA, #When demand above this value
+                "pGlim": 450/instance.baseMVA, #And wind in NI below this value
                 "Ug_LB": 1,
                 "Ug_UB": None, 
             },
             "S_NBMIN_MP_NB": {
-                #TODO Update limit values to real Ireland system
-                "pGlim": 40/instance.baseMVA, #When wind generation in ROI less than                                    
+                "pGlim": 1000/instance.baseMVA, #When wind generation in ROI less than                                    
                 "Ug_LB": 1,
                 "Ug_UB": None, 
             },

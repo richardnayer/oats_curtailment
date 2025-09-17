@@ -20,7 +20,7 @@ formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(message)s")
 handler.setFormatter(formatter)
 logger.addHandler(handler)
 
-def run_model(testcase = "illustrative_testcase.xlsx", solver = "appsi_highs", model="DCOPF"):
+def run_model(testcase = "ireland_case_v1.xlsx", solver = "appsi_highs", model="DCOPF"):
 
 
     match model:
