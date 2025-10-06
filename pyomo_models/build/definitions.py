@@ -313,7 +313,7 @@ class Sets_Blocks:
             ComponentName.DNeg: SetDef(
                 within=ComponentName.D,
                 initialize=lambda: helpers.get_param_list(
-                    case, "demands", "name", "real", "<", 0
+                    case, "demands", "name", "real", "<=", 0
                 ),
             ),
             ComponentName.demand_bus_mapping: SetDef(
@@ -692,8 +692,8 @@ class Constraint_Blocks:
             ),
             # --- SNSP ---
             ComponentName.gen_SNSP: ConstraintDef(
-                index=ComponentName.G_prorata,
-                rule=lambda instance, generator: sum(instance.pG[generator] for generator in instance.G_ns) <=
+                index=None,
+                rule=lambda instance: sum(instance.pG[generator] for generator in instance.G_ns) <=
                 (0.75/(1-0.75)) * sum(instance.pG[generator] for generator in instance.G_s),
             ),
             # --- Pro-Rata ERG Curtailment (As Defined by Generator Type) ---

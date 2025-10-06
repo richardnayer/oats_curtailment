@@ -1,6 +1,7 @@
 
 from pyomo.environ import *
 from pyomo.opt import SolverFactory
+from pyomo.contrib import appsi
 from pyomo.util.infeasible import log_infeasible_constraints
 
 # Set up logger
@@ -16,6 +17,9 @@ def solveinstance(instance, solver='appsi_highs'):
     '''
     This function solves the instance
     '''
+    if solver == 'gurobi':
+        opt = appsi.solvers.Gurobi()
+
     opt = SolverFactory(solver)
     
     try:

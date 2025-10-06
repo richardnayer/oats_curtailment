@@ -38,11 +38,11 @@ def all_island_iterations_summary_df(case, output):
         "non-synchronous availability (MW)",
         "surplus (MW)",
         "non-synchronous generation (MW)",
-        "dispatch down (MW)",
-        "total curtailment (MW)",
-        "SNSP curtailment (MW)",
-        "MUON curtailment (MW)",
-        "constraint (MW)"
+        "dispatch down (MWh",
+        "total curtailment (MWh)",
+        "SNSP curtailment (MWh)",
+        "MUON curtailment (MWh)",
+        "constraint (MWh)"
     ]
 
     return summary_df

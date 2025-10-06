@@ -111,7 +111,7 @@ def add_sets_to_instance(instance: Any, set_defs: Iterable[Any]) -> None:
         name_str = _name_to_str(getattr(set_def, "name"))
         if hasattr(instance, name_str):
             instance.del_component(getattr(instance, name_str))
-            logger.info(f"Deleted and redefined set component {name_str}")
+            logger.debug(f"Deleted and redefined set component {name_str}")
         instance.add_component(name_str, component)
 
 def add_iteration_sets_to_instance(instance: Any, case: Any, set_list: list[Any], iteration: int) -> None:
@@ -144,7 +144,7 @@ def add_iteration_sets_to_instance(instance: Any, case: Any, set_list: list[Any]
 
             if hasattr(instance, name):
                 instance.del_component(getattr(instance, name))
-                logger.info(f"Deleted and redefined set component {name}")
+                logger.debug(f"Deleted and redefined set component {name}")
             instance.add_component(name, component)
 
 
@@ -165,7 +165,7 @@ def add_params_to_instance(instance: Any, param_defs: Iterable[Any]) -> None:
         name_str = _name_to_str(getattr(param_def, "name"))
         if hasattr(instance, name_str):
             instance.del_component(getattr(instance, name_str))
-            logger.info(f"Deleted and redefined parameter component {name_str}")
+            logger.debug(f"Deleted and redefined parameter component {name_str}")
         instance.add_component(name_str, component)
 
 def add_iteration_params_to_instance(instance: Any, case: Any, param_list: list[Any], iteration: int) -> None:
@@ -207,7 +207,7 @@ def add_variables_to_instance(instance: Any, variable_defs: Iterable[Any]) -> No
         name_str = _name_to_str(getattr(variable_def, "name"))
         if hasattr(instance, name_str):
             instance.del_component(getattr(instance, name_str))
-            logger.info(f"Deleted and redefined variable component {name_str}")
+            logger.debug(f"Deleted and redefined variable component {name_str}")
         instance.add_component(name_str, component)
 
 def add_constraints_to_instance(instance: Any, constraint_defs: Iterable[Any]) -> None:
@@ -225,7 +225,7 @@ def add_constraints_to_instance(instance: Any, constraint_defs: Iterable[Any]) -
         name_str = _name_to_str(getattr(constraint_def, "name"))
         if hasattr(instance, name_str):
             instance.del_component(getattr(instance, name_str))
-            logger.info(f"Deleted and redefined constraint component {name_str}")
+            logger.debug(f"Deleted and redefined constraint component {name_str}")
         instance.add_component(name_str, component)
 
 def remove_component_from_instance(instance: Any, component_list: Iterable[str], skip_missing = False) -> None:

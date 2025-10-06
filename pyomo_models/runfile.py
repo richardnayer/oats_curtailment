@@ -20,7 +20,7 @@ formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(message)s")
 handler.setFormatter(formatter)
 logger.addHandler(handler)
 
-def run_model(testcase = "ireland_case_v1.xlsx", solver = "appsi_highs", model="DCOPF"):
+def run_model(testcase = "ireland_case_july2025.xlsx", solver = "gurobi", model="DCOPF", iter_len = 1):
 
 
     match model:
@@ -30,7 +30,7 @@ def run_model(testcase = "ireland_case_v1.xlsx", solver = "appsi_highs", model="
             case._load_excel_case(testcase)
             case.summary()
             #run model
-            output, result = dcopf_snapshot.model(case, solver)
+            output, result = dcopf_snapshot.model(case, solver, iter_len)
             return output, result
         
         case 'DCOPF Timeseries':
@@ -54,6 +54,6 @@ def run_model(testcase = "ireland_case_v1.xlsx", solver = "appsi_highs", model="
             KeyError(f"The model selected ({model}) has not been defined")
         
 
-output, result = run_model(model = "All Island Timeseries")
+output, result = run_model(model = "All Island Timeseries", iter_len = 0.5)
 
 

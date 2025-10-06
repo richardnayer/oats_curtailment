@@ -222,12 +222,12 @@ class Case(UserDict):
                 'dropna': True,
                 'filter_active': True
             },
-            'ts_PGMINGEN': {
-                'key': 'ts_PGMINGEN',
-                'index': 'timestep',
-                'dropna': True,
-                'filter_active': True
-            },
+            # 'ts_PGMINGEN': {
+            #     'key': 'ts_PGMINGEN',
+            #     'index': 'timestep',
+            #     'dropna': True,
+            #     'filter_active': True
+            # },
             'ts_PGLB': {
                 'key': 'ts_PGLB',
                 'index': 'timestep',
