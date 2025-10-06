@@ -18,15 +18,33 @@ def solveinstance(instance, solver='appsi_highs'):
     This function solves the instance
     '''
     if solver == 'gurobi':
-        opt = appsi.solvers.Gurobi()
+        options = {
+            'DualReductions': 0
+        }
 
-    opt = SolverFactory(solver)
+        with SolverFactory(
+            "gurobi_persistent",
+            solver_io = 'python',
+            manage_env = True,
+            options = options
+            ) as opt:
+
+            try:
+                opt.set_instance(instance)
+                result = opt.solve(instance, tee = True, warmstart = True)
+                return result
+            except RuntimeError as exc:
+                log_infeasible_constraints(instance, logger=logger, log_expression=False, log_variables=False)
+                raise RuntimeError("Solver Error") from exc
     
-    try:
-        result = opt.solve(instance, tee=False, warmstart=True)
-        return result
-    except RuntimeError as exc:
-        log_infeasible_constraints(instance, logger=logger, log_expression=False, log_variables=False)
-        raise RuntimeError("Solver Error") from exc
+    else:
+        opt = SolverFactory(solver)
+    
+        try:
+            result = opt.solve(instance, tee=True, warmstart=True)
+            return result
+        except RuntimeError as exc:
+            log_infeasible_constraints(instance, logger=logger, log_expression=False, log_variables=False)
+            raise RuntimeError("Solver Error") from exc
 
     

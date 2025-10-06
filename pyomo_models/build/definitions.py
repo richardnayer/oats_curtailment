@@ -693,8 +693,16 @@ class Constraint_Blocks:
             # --- SNSP ---
             ComponentName.gen_SNSP: ConstraintDef(
                 index=None,
-                rule=lambda instance: sum(instance.pG[generator] for generator in instance.G_ns) <=
-                (0.75/(1-0.75)) * sum(instance.pG[generator] for generator in instance.G_s),
+                rule=lambda instance:
+                    sum(instance.pG[generator] for generator in instance.G_ns_noint)
+                    +
+                    sum(instance.pG[generator] for generator in instance.importing_interconnectors)
+                    <=
+                    0.75 * (
+                        sum(instance.PD[demand] for demand in instance.D)
+                        +
+                        sum(instance.pG[generator] for generator in instance.exporting_interconnectors)
+                    ),
             ),
             # --- Pro-Rata ERG Curtailment (As Defined by Generator Type) ---
             ComponentName.gen_prorata_curtailment_realpower: ConstraintDef(

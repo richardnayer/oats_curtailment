@@ -46,7 +46,7 @@ def run_model(testcase = "ireland_case_july2025.xlsx", solver = "gurobi", model=
             case = load_case.Case()
             case._load_excel_case(testcase, iterative = True)
             case.summary()
-            output, result = all_island_iterations.model(case, solver)
+            output, result = all_island_iterations.model(case, solver, iter_len)
             print_data.all_island_timeseries_to_excel(case, output)
             return output, result
 

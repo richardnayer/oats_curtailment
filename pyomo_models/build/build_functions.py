@@ -126,7 +126,20 @@ def add_iteration_sets_to_instance(instance: Any, case: Any, set_list: list[Any]
                                        "index": None,
                                        "within": ComponentName.TRANSF,
                                        "initialize":lambda: helpers.get_ts_param_index_list(case, "ts_TLmax", iteration, ">", 0)
-                                       }
+                                       },
+        
+        "importing_interconnectors": {"dimen": 1,
+                                      "index": None,
+                                      "within": ComponentName.G,
+                                      "initialize": [gen for gen, pgmax in instance.PGmax._data.items() if gen in ["EWIC", "GLK", "M"] if pgmax.value > 0]
+                                    },
+        "exporting_interconnectors": {"dimen": 1,
+                                "index": None,
+                                "within": ComponentName.G,
+                                "initialize": [gen for gen, pgmax in instance.PGmax._data.items() if gen in ["EWIC", "GLK", "M"] if pgmax.value < 0]
+                            }
+
+
     }
 
     for sett in set_list:

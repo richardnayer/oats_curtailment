@@ -302,11 +302,20 @@ def model(case: object, solver, iter_len = 1):
                                                                 .drop(columns='name_drop')\
                                                                 .loc[lambda d: (d['zone'] == 'NI') & (d['FuelType'] == 'Wind')]['name']))
 
+    
+    #Create sets for SNSP Analysis
+    interconnectors = ["EWIC", "GLK", "M"]
+    instance.G_ns_noint = Set(within = instance.G,
+                              initialize = [G for G in instance.G_ns if G not in interconnectors])
+    instance.interconnectors = Set(within = instance.G,
+                                   initialize = [G for G in instance.G if G in interconnectors])
 
 
     #Define time dependent sets (to be updated each iteration)
     ts_sets = [ComponentName.L_nonzero,
-               ComponentName.TRANSF_nonzero] 
+               ComponentName.TRANSF_nonzero,
+               "importing_interconnectors",
+               "exporting_interconnectors"] 
 
     #Define list of parameters for model and add to model
     paramlist = [
@@ -560,10 +569,10 @@ def model(case: object, solver, iter_len = 1):
     for block in block_constraints:
         getattr(instance, block).deactivate()
 
+
     #Ensure interconnectors are always on:
     for interconnector in ['EWIC', 'GLK', 'M']:
         instance.u_g[interconnector].fix(1)
-
 
 
     #MODEL ITERATIONS
@@ -581,6 +590,13 @@ def model(case: object, solver, iter_len = 1):
 
         #Update any sets for current timestep
         add_iteration_sets_to_instance(instance, case, ts_sets, iteration)
+
+        #Update interconnector import/export sets
+        # instance.importing_interconnectors = Set(within = instance.G,
+        #                                          initialize = [gen for gen, pgmax in instance.PGmax._data.items() if gen in ["EWIC", "GLK", "M"] if pgmax.value > 0])
+        # instance.exporting_interconnectors = Set(within = instance.G,
+        #                                          initialize = [gen for gen, pgmax in instance.PGmax._data.items() if gen in ["EWIC", "GLK", "M"] if pgmax.value < 0])
+
 
         #~~~~~~~~~~~# COPPER PLATE MARKET MODEL SECTION #~~~~~~~~~~~#
         market_constraints_to_activate = [#Add Power Balance & Demand
@@ -768,26 +784,26 @@ def model(case: object, solver, iter_len = 1):
         #NOTE ALL VALUES ARE CONVERTED INTO MWh
         #Calculate overall surplus volumes, and surplus per generator
         setattr(output[iteration]["dcopf"], 'V_Surplus', sum((instance.PGmax[g].value - instance.PG_MARKET[g].value) for g in instance.G_ns) / iter_len)
-        setattr(output[iteration]["dcopf"], 'v_Surplus_g', {g: (instance.PGmax[g].value - instance.PG_MARKET[g].value)/iter_len for g in instance.G_ns})
+        setattr(output[iteration]["dcopf"], 'v_Surplus_g', {g: (instance.PGmax[g].value - instance.PG_MARKET[g].value)*iter_len for g in instance.G_ns})
         output[iteration]["dcopf"].v_Surplus_g.update({g: 0 for g in instance.G_s})
         
 
         #Calculate overall SNSP volume. Then divide by non-synchronous generators pro-rata.
-        setattr(output[iteration]["dcopf"], 'V_SNSP', max(0, sum(instance.PG_MARKET[g].value for g in instance.G_ns) - 0.75*sum(instance.PG_MARKET[g].value for g in instance.G))/iter_len)
+        setattr(output[iteration]["dcopf"], 'V_SNSP', max(0, sum(instance.PG_MARKET[g].value for g in instance.G_ns) - 0.75*sum(instance.PG_MARKET[g].value for g in instance.G))*iter_len)
         setattr(output[iteration]["dcopf"], 'x_SNSP', max(0, sum(instance.PG_MARKET[g].value for g in instance.G_ns)/sum(instance.PG_MARKET[g].value for g in instance.G_ns) - 0.75))
-        setattr(output[iteration]["dcopf"], 'v_SNSP_g', {g: (instance.PG_MARKET[g].value/iter_len * output[iteration]["dcopf"].x_SNSP)for g in instance.G_ns})
+        setattr(output[iteration]["dcopf"], 'v_SNSP_g', {g: (instance.PG_MARKET[g].value*iter_len * output[iteration]["dcopf"].x_SNSP)for g in instance.G_ns})
         output[iteration]["dcopf"].v_SNSP_g.update({g: 0 for g in instance.G_s})
 
         #Calculate overall MUON volume. Then divide by non-synchronous generators pro-rata
-        setattr(output[iteration]["dcopf"], 'V_MUON', (sum((instance.PG_MARKET[g].value - instance.PG_SECURE[g].value) for g in instance.G_ns) - output[iteration]["dcopf"].V_SNSP)/iter_len)
-        setattr(output[iteration]["dcopf"], 'x_MUON', output[iteration]["dcopf"].V_MUON / sum(instance.PG_MARKET[g].value for g in instance.G_ns)/iter_len)
-        setattr(output[iteration]["dcopf"], 'v_MUON_g', {g: (instance.PG_MARKET[g].value/iter_len * output[iteration]["dcopf"].x_MUON) for g in instance.G_ns})
+        setattr(output[iteration]["dcopf"], 'V_MUON', (sum((instance.PG_MARKET[g].value - instance.PG_SECURE[g].value) for g in instance.G_ns) - output[iteration]["dcopf"].V_SNSP)*iter_len)
+        setattr(output[iteration]["dcopf"], 'x_MUON', output[iteration]["dcopf"].V_MUON / sum(instance.PG_MARKET[g].value for g in instance.G_ns)*iter_len)
+        setattr(output[iteration]["dcopf"], 'v_MUON_g', {g: (instance.PG_MARKET[g].value*iter_len * output[iteration]["dcopf"].x_MUON) for g in instance.G_ns})
         output[iteration]["dcopf"].v_MUON_g.update({g: 0 for g in instance.G_s})
 
         #Calculate overall constraint volume.
-        setattr(output[iteration]["dcopf"],'V_Constraint', sum((instance.PG_SECURE[g].value - instance.pG[g].value)/iter_len for g in instance.G_ns))
+        setattr(output[iteration]["dcopf"],'V_Constraint', sum((instance.PG_SECURE[g].value - instance.pG[g].value)*iter_len for g in instance.G_ns))
         setattr(output[iteration]["dcopf"],'x_Constraint',{g: (instance.PG_SECURE[g].value - instance.pG[g].value)/instance.PG_SECURE[g].value if instance.PG_SECURE[g].value > 0 else 0 for g in instance.G_ns})
-        setattr(output[iteration]["dcopf"], 'v_Constraint_g',{g: (instance.PG_SECURE[g].value - instance.pG[g].value)/iter_len for g in instance.G_ns})
+        setattr(output[iteration]["dcopf"], 'v_Constraint_g',{g: (instance.PG_SECURE[g].value - instance.pG[g].value)*iter_len for g in instance.G_ns})
         output[iteration]["dcopf"].v_Constraint_g.update({g: 0 for g in instance.G_s})
         logger.info(f"Iteration {iteration} solved")
         ...
