@@ -19,19 +19,19 @@ def solveinstance(instance, solver='appsi_highs'):
     '''
     if solver == 'gurobi':
         options = {
-            'DualReductions': 0
+            'OutputFlag': 0
         }
 
         with SolverFactory(
-            "gurobi_persistent",
+            "gurobi",
             solver_io = 'python',
             manage_env = True,
             options = options
             ) as opt:
 
             try:
-                opt.set_instance(instance)
-                result = opt.solve(instance, tee = True, warmstart = True)
+                # opt.set_instance(instance)
+                result = opt.solve(instance, tee = False, warmstart = True)
                 return result
             except RuntimeError as exc:
                 log_infeasible_constraints(instance, logger=logger, log_expression=False, log_variables=False)
@@ -41,7 +41,7 @@ def solveinstance(instance, solver='appsi_highs'):
         opt = SolverFactory(solver)
     
         try:
-            result = opt.solve(instance, tee=True, warmstart=True)
+            result = opt.solve(instance, tee=False, warmstart=True)
             return result
         except RuntimeError as exc:
             log_infeasible_constraints(instance, logger=logger, log_expression=False, log_variables=False)

@@ -202,25 +202,29 @@ class Case(UserDict):
                 'key': 'ts_PD',
                 'index': 'timestep',
                 'dropna': True,
-                'filter_active': True
+                'filter_active': True,
+                # 'col_types': {'timestep': pd.StringDtype(),}
             },
             'ts_VOLL': {
                 'key': 'ts_VOLL',
                 'index': 'timestep',
                 'dropna': True,
-                'filter_active': True
+                'filter_active': True,
+                # 'col_types': {'timestep': pd.StringDtype(),}
             },
             'ts_Lmax': {
                 'key': 'ts_Lmax',
                 'index': 'timestep',
                 'dropna': True,
-                'filter_active': True
+                'filter_active': True,
+                # 'col_types': {'timestep': pd.StringDtype(),}
             },
             'ts_TLmax': {
                 'key': 'ts_TLmax',
                 'index': 'timestep',
                 'dropna': True,
-                'filter_active': True
+                'filter_active': True,
+                # 'col_types': {'timestep': pd.StringDtype(),}
             },
             # 'ts_PGMINGEN': {
             #     'key': 'ts_PGMINGEN',
@@ -232,19 +236,22 @@ class Case(UserDict):
                 'key': 'ts_PGLB',
                 'index': 'timestep',
                 'dropna': True,
-                'filter_active': True
+                'filter_active': True,
+                # 'col_types': {'timestep': pd.StringDtype(),}
             },
             'ts_PGUB': {
                 'key': 'ts_PGUB',
                 'index': 'timestep',
                 'dropna': True,
-                'filter_active': True
+                'filter_active': True,
+                # 'col_types': {'timestep': pd.StringDtype(),}
             },
             'ts_bid': {
                 'key': 'ts_bid',
                 'index': 'timestep',
                 'dropna': True,
-                'filter_active': True
+                'filter_active': True,
+                # 'col_types': {'timestep': pd.StringDtype(),}
             }
         }
 
@@ -252,7 +259,7 @@ class Case(UserDict):
         self._sheet_parser(excel_file, sheet_config)
 
         #Take timseries data from index and define as timesteps
-        self.iterations = self.ts_PD.index
+        self.iterations = self.ts_PD.index.to_list()
 
     def _set_baseMVA(self) -> float:
         if len(self.baseMVA['baseMVA']) > 1:

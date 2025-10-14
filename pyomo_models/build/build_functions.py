@@ -131,12 +131,12 @@ def add_iteration_sets_to_instance(instance: Any, case: Any, set_list: list[Any]
         "importing_interconnectors": {"dimen": 1,
                                       "index": None,
                                       "within": ComponentName.G,
-                                      "initialize": [gen for gen, pgmax in instance.PGmax._data.items() if gen in ["EWIC", "GLK", "M"] if pgmax.value > 0]
+                                      "initialize": lambda: [x for x in ["EWIC", "GLK", "M"] if x in helpers.get_ts_param_index_list(case, "ts_PGUB", iteration, ">", 0)]
                                     },
         "exporting_interconnectors": {"dimen": 1,
                                 "index": None,
                                 "within": ComponentName.G,
-                                "initialize": [gen for gen, pgmax in instance.PGmax._data.items() if gen in ["EWIC", "GLK", "M"] if pgmax.value < 0]
+                                "initialize": lambda: [x for x in ["EWIC", "GLK", "M"] if x in helpers.get_ts_param_index_list(case, "ts_PGUB", iteration, "<", 0)]
                             }
 
 

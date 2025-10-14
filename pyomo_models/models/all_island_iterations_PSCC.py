@@ -534,6 +534,13 @@ def model(case: object, solver, iter_len = 1):
     MUON_NB_bigM_constraints_list = ["S_NBMIN_CPS", "S_NBMIN_MP_NB"]
     MUON_NB_BigM_constraints(case, instance, MUON_NB_bigM_constraint_dict, selected_constraints = MUON_NB_bigM_constraints_list)
 
+    #List of all generators to which MUON constraints apply
+    NB_gens = []
+    for c in MUON_NB_constraints_list + MUON_MW_constraint_list + MUON_NB_bigM_constraints_list:
+        for g in getattr(instance, 'G_'+c):
+            if g not in NB_gens:
+                NB_gens += [g]
+
     #DCOPF MODEL CONSTRAINTS #
     dcopf_constraints = [#Power Balance - Kirchoffs Current Law (P
                         ComponentName.KCL_networked_realpower_noshunt,
@@ -570,26 +577,35 @@ def model(case: object, solver, iter_len = 1):
         getattr(instance, block).deactivate()
 
 
-    #Ensure interconnectors are always on:
-    for interconnector in ['EWIC', 'GLK', 'M']:
-        instance.u_g[interconnector].fix(1)
+
+
+
+
 
 
     #MODEL ITERATIONS
-    for iteration in case.iterations:
+    for iteration in ["05/07/25 08:00"]:
         #Create new output & result dictionary space
         output[iteration] = {}
         result[iteration] = {}
 
         #~~~~~~~~~~~# ITERATION INPUT DATA UPDATES #~~~~~~~~~~~#
+        #Update any sets for current timestep
+        add_iteration_sets_to_instance(instance, case, ts_sets, iteration)
+
         #Update parameters for current timestep
         add_iteration_params_to_instance(instance, case, ts_params, iteration)
 
         #Update big-M binary parameters for this iteration
         MUON_NB_BigM_param_update(instance, MUON_NB_bigM_constraint_dict)
 
-        #Update any sets for current timestep
-        add_iteration_sets_to_instance(instance, case, ts_sets, iteration)
+        #Ensure interconnectors are always on:
+        for interconnector in ['EWIC', 'GLK', 'M']:
+            instance.u_g[interconnector].fix(1)
+
+        #As sets for non-synchronous generation and interconnectors change each iteration, delete and rebuild gen_SNSP
+        build_constraints(instance, [ComponentName.gen_SNSP])
+        getattr(instance, ComponentName.gen_SNSP).deactivate()
 
         #Update interconnector import/export sets
         # instance.importing_interconnectors = Set(within = instance.G,
@@ -611,7 +627,13 @@ def model(case: object, solver, iter_len = 1):
         
         for c in market_constraints_to_activate:
             getattr(instance, c).activate()
+
         
+        #Solve issue of zero capacity units returning 'None' for generation variables
+        for g in instance.G:
+            if instance.PGmax[g].value == 0 and instance.PGmin[g].value == 0:
+                instance.u_g[g].set_value(0)  # provides a defined value for logs/reports
+                instance.pG[g].set_value(0)
 
         #Set Objective
         instance.OBJ = Objective(rule = copper_plate_marginal_cost_objective(instance), sense = minimize)
@@ -688,6 +710,7 @@ def model(case: object, solver, iter_len = 1):
         # output[iteration]["copper_curtailed"].obj_value(instance)
 
 
+
         #~~~~~~~~~~~# DCOPF MODEL SECTION #~~~~~~~~~~~#
         #Remove Constraints No Longer Needed
         constraints_to_deactivate_for_dcopf = [#Generation constraints used in previous models (superceeded by updated PGmax)
@@ -741,16 +764,15 @@ def model(case: object, solver, iter_len = 1):
             getattr(instance, c).activate()
 
         #Update Objective
-        # instance.del_component(instance.OBJ)
-        # instance.OBJ = Objective(rule = redispatch_from_secure_cost_objective(instance), sense = minimize)
-
+        instance.del_component(instance.OBJ)
+        instance.OBJ = Objective(rule = redispatch_from_secure_cost_objective(instance), sense = minimize)
 
         result[iteration]["dcopf"] = pyosolve.solveinstance(instance, solver = solver)
 
         #Define Data to Save
         data_to_cache = {"Var": [], 
-                    "Param" : [],
-                    "Set" : []}
+                        "Param" : [],
+                        "Set" : []}
         
         #Cache Data
         output[iteration]["dcopf"] = pyomo_io.InstanceCache(result[iteration]["dcopf"], data_to_cache)
@@ -759,7 +781,76 @@ def model(case: object, solver, iter_len = 1):
         output[iteration]["dcopf"].param(instance)
         output[iteration]["dcopf"].obj_value(instance)
 
-        #~~~~~~~~~~~# COPPER PLATE TEST CODE RESET #~~~~~~~~~~~#
+        #~~~~~~~~~~~# CALCULATE CURTAILMENT AND CONSTRAINT VOLUMES (MWh per iteration) #~~~~~~~~~~~#
+        #NOTE ALL VALUES ARE CONVERTED INTO MWh
+        #Calculate overall surplus volumes, and surplus per generator
+        setattr(output[iteration]["dcopf"], 'V_Surplus', sum((instance.PGmax[g].value - instance.PG_MARKET[g].value) for g in instance.G_ns_noint) / iter_len)
+        setattr(output[iteration]["dcopf"], 'v_Surplus_g', {g: (instance.PGmax[g].value - instance.PG_MARKET[g].value)*iter_len for g in instance.G_ns_noint})
+        output[iteration]["dcopf"].v_Surplus_g.update({g: 0 for g in instance.G if g not in instance.G_ns_noint})
+        
+
+        #Calculate overall SNSP volume. Then divide by non-synchronous generators pro-rata.
+        x_SNSP = max(0 ,(sum(instance.PG_MARKET[generator].value for generator in instance.G_ns_noint) 
+                         + sum(instance.PG_MARKET[generator].value for generator in instance.importing_interconnectors)
+                         )
+                        /
+                        (sum(instance.PD[demand].value for demand in instance.D) 
+                         + sum(-instance.PG_MARKET[generator].value for generator in instance.exporting_interconnectors)
+                         )
+                        -
+                        0.75
+                        )
+        
+        V_SNSP = x_SNSP * (sum(instance.PD[demand].value for demand in instance.D) 
+                         + sum(-instance.PG_MARKET[generator].value for generator in instance.exporting_interconnectors)
+                         ) * iter_len
+        v_SNSP_g = {g: instance.PG_MARKET[g].value * x_SNSP * iter_len for g in instance.G_ns_noint}
+        v_SNSP_g.update({g: 0 for g in instance.G if g not in instance.G_ns_noint})
+
+        setattr(output[iteration]["dcopf"], 'V_SNSP', V_SNSP)
+        setattr(output[iteration]["dcopf"], 'x_SNSP', x_SNSP)
+        setattr(output[iteration]["dcopf"], 'v_SNSP_g', v_SNSP_g)
+
+        #Calculate overall MUON volume. Then divide by non-synchronous generators pro-rata
+        V_MUON = (sum((instance.PG_MARKET[g].value - instance.PG_SECURE[g].value) for g in instance.G_ns_noint)*iter_len - V_SNSP)
+        x_MUON = V_MUON / sum(instance.PG_MARKET[g].value for g in instance.G_ns_noint)*iter_len
+        v_MUON_g = {g: (instance.PG_MARKET[g].value*iter_len * x_MUON) for g in instance.G_ns_noint}
+        v_MUON_g.update({g: 0 for g in instance.G if g not in instance.G_ns_noint})
+        setattr(output[iteration]["dcopf"], 'V_MUON', V_MUON)
+        setattr(output[iteration]["dcopf"], 'x_MUON', x_MUON)
+        setattr(output[iteration]["dcopf"], 'v_MUON_g', v_MUON_g)
+
+        #Calculate overall constraint volume.
+        setattr(output[iteration]["dcopf"],'V_Constraint', sum((instance.PG_SECURE[g].value - instance.pG[g].value)*iter_len for g in instance.G_ns_noint))
+        setattr(output[iteration]["dcopf"],'x_Constraint',{g: (instance.PG_SECURE[g].value - instance.pG[g].value)/instance.PG_SECURE[g].value if instance.PG_SECURE[g].value > 0 else 0 for g in instance.G_ns_noint})
+        setattr(output[iteration]["dcopf"], 'v_Constraint_g',{g: (instance.PG_SECURE[g].value - instance.pG[g].value)*iter_len for g in instance.G_ns_noint})
+        output[iteration]["dcopf"].v_Constraint_g.update({g: 0 for g in instance.G if g not in instance.G_ns_noint})
+        logger.info(f"Iteration {iteration} solved")
+        ...
+        if sum(instance.pG[g].value for g in instance.importing_interconnectors) + sum(instance.pG[g].value for g in instance.exporting_interconnectors) != sum(instance.PGmax[g].value for g in instance.importing_interconnectors) + sum(instance.PGmax[g].value for g in instance.exporting_interconnectors):
+            raise Exception("Interconnector dispatch not equal to required constraint")
+
+        #Calculate the quantities of min-gen security
+        # NB_gens = []
+        # for c in MUON_NB_constraints_list + MUON_MW_constraint_list + MUON_NB_bigM_constraints_list:
+        #     for g in getattr(instance, 'G_'+c):
+        #         if g not in NB_gens:
+        #             NB_gens += [g]
+        
+        # PG_MARKET_NB = sum(instance.PG_MARKET[g].value for g in NB_gens)*iter_len
+        # PG_SECURE_NB = sum(instance.PG_SECURE[g].value for g in NB_gens)*iter_len
+                
+
+        # for c in instance.MUON.component_objects(Constraint, active = None, descend_into=True):
+        #     if c.is_indexed() == False:
+        #         if c.body() == c.lb or c.body() == c.ub:
+        #             print(c, c.body(), c.lb, c.ub)
+        #     if c.is_indexed() == True:
+        #         for sub_c in c._data.values():
+        #             if sub_c.body() == sub_c.lb or sub_c.body() == sub_c.ub:
+        #                 print(sub_c, sub_c.body(), sub_c.lb, sub_c.ub)
+
+        #~~~~~~~~~~~# COPPER PLATE CODE RESET #~~~~~~~~~~~#
         #list of constraints to deactivate
         constraints_to_deactivate_to_end_dcopf = [#SNSP Constraint
                                      'gen_SNSP',
@@ -779,34 +870,7 @@ def model(case: object, solver, iter_len = 1):
         
         #Delete objective
         instance.del_component(instance.OBJ)
-    
-        #~~~~~~~~~~~# CALCULATE CURTAILMENT AND CONSTRAINT VOLUMES (MWh per iteration) #~~~~~~~~~~~#
-        #NOTE ALL VALUES ARE CONVERTED INTO MWh
-        #Calculate overall surplus volumes, and surplus per generator
-        setattr(output[iteration]["dcopf"], 'V_Surplus', sum((instance.PGmax[g].value - instance.PG_MARKET[g].value) for g in instance.G_ns) / iter_len)
-        setattr(output[iteration]["dcopf"], 'v_Surplus_g', {g: (instance.PGmax[g].value - instance.PG_MARKET[g].value)*iter_len for g in instance.G_ns})
-        output[iteration]["dcopf"].v_Surplus_g.update({g: 0 for g in instance.G_s})
-        
 
-        #Calculate overall SNSP volume. Then divide by non-synchronous generators pro-rata.
-        setattr(output[iteration]["dcopf"], 'V_SNSP', max(0, sum(instance.PG_MARKET[g].value for g in instance.G_ns) - 0.75*sum(instance.PG_MARKET[g].value for g in instance.G))*iter_len)
-        setattr(output[iteration]["dcopf"], 'x_SNSP', max(0, sum(instance.PG_MARKET[g].value for g in instance.G_ns)/sum(instance.PG_MARKET[g].value for g in instance.G_ns) - 0.75))
-        setattr(output[iteration]["dcopf"], 'v_SNSP_g', {g: (instance.PG_MARKET[g].value*iter_len * output[iteration]["dcopf"].x_SNSP)for g in instance.G_ns})
-        output[iteration]["dcopf"].v_SNSP_g.update({g: 0 for g in instance.G_s})
-
-        #Calculate overall MUON volume. Then divide by non-synchronous generators pro-rata
-        setattr(output[iteration]["dcopf"], 'V_MUON', (sum((instance.PG_MARKET[g].value - instance.PG_SECURE[g].value) for g in instance.G_ns) - output[iteration]["dcopf"].V_SNSP)*iter_len)
-        setattr(output[iteration]["dcopf"], 'x_MUON', output[iteration]["dcopf"].V_MUON / sum(instance.PG_MARKET[g].value for g in instance.G_ns)*iter_len)
-        setattr(output[iteration]["dcopf"], 'v_MUON_g', {g: (instance.PG_MARKET[g].value*iter_len * output[iteration]["dcopf"].x_MUON) for g in instance.G_ns})
-        output[iteration]["dcopf"].v_MUON_g.update({g: 0 for g in instance.G_s})
-
-        #Calculate overall constraint volume.
-        setattr(output[iteration]["dcopf"],'V_Constraint', sum((instance.PG_SECURE[g].value - instance.pG[g].value)*iter_len for g in instance.G_ns))
-        setattr(output[iteration]["dcopf"],'x_Constraint',{g: (instance.PG_SECURE[g].value - instance.pG[g].value)/instance.PG_SECURE[g].value if instance.PG_SECURE[g].value > 0 else 0 for g in instance.G_ns})
-        setattr(output[iteration]["dcopf"], 'v_Constraint_g',{g: (instance.PG_SECURE[g].value - instance.pG[g].value)*iter_len for g in instance.G_ns})
-        output[iteration]["dcopf"].v_Constraint_g.update({g: 0 for g in instance.G_s})
-        logger.info(f"Iteration {iteration} solved")
-        ...
 
     return output, result
 
